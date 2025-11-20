@@ -137,6 +137,7 @@ const LANGUAGES = [
 const TRANSLATIONS = {
     zh: {
         app_name: '先导者 OS',
+        turn_start: '回合开始',
         system_booting: '系统启动中...',
         attack: '攻击',
         reset: '重置',
@@ -215,6 +216,7 @@ const TRANSLATIONS = {
     },
     en: {
         app_name: 'VANGUARD OS',
+        turn_start: 'Turn Start',
         system_booting: 'BOOTING...',
         attack: 'ATK',
         reset: 'RESET',
@@ -293,6 +295,7 @@ const TRANSLATIONS = {
     },
     ja: {
         app_name: 'ヴァンガード OS',
+        turn_start: 'ターン開始',
         system_booting: '起動中...',
         attack: 'アタック',
         reset: 'リセット',
@@ -1231,7 +1234,7 @@ export default function App() {
                             {/* 回合状态重置 (Round Reset) */}
                             <button onClick={roundStateReset} className="py-1.5 bg-red-800/50 text-red-300 border border-red-700 rounded-lg font-bold text-xs hover:bg-red-700/70 transition-colors flex items-center justify-center gap-1"><RefreshCcw size={12} /> {t.round_reset}</button>
                             {/* 回合开始 (Turn Start - Ride + 3 EN) */}
-                            <button onClick={handleTurnStart} className="py-1.5 bg-green-800/50 text-green-300 border border-green-700 rounded-lg font-bold text-xs hover:bg-green-700/70 transition-colors flex items-center justify-center gap-1"><ChevronsUp size={12} /> 回合开始</button>
+                            <button onClick={handleTurnStart} className="py-1.5 bg-green-800/50 text-green-300 border border-green-700 rounded-lg font-bold text-xs hover:bg-green-700/70 transition-colors flex items-center justify-center gap-1"><ChevronsUp size={12} /> {t.turn_start}</button>
                             <button onClick={handleAttackUndo} disabled={gameState.attackHistory.length === 0} className={`py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-1 border ${gameState.attackHistory.length === 0 ? 'bg-slate-900 text-slate-700 border-slate-800 cursor-not-allowed opacity-50' : 'bg-yellow-800/50 text-yellow-300 border-yellow-700 hover:bg-yellow-700/70'}`}><CornerUpLeft size={12} /> {t.undo_attack}</button>
                         </div>
                         {/* NEW Row 2: Support Mode & Front Buff */}
@@ -1298,7 +1301,7 @@ export default function App() {
                                     value={manualGuardInput}
                                     onChange={(e) => setManualGuardInput(e.target.value)}
                                     placeholder={t.set_shield_manual}
-                                    className="flex-grow bg-blue-950/30 text-white text-[10px] px-1 py-0.5 rounded outline-none font-mono border border-blue-800 focus:border-cyan-400 text-center"
+                                    className="flex-grow min-w-0 bg-blue-950/30 text-white text-[10px] px-1 py-0.5 rounded outline-none font-mono border border-blue-800 focus:border-cyan-400 text-center"
                                 />
                                 <button
                                     onClick={() => modifyShield(1000)}
@@ -1362,7 +1365,7 @@ export default function App() {
                     <div className="p-4 max-w-md mx-auto space-y-4">
                         <div className="flex justify-between items-center border-b border-slate-800 pb-2"><div className="flex flex-col"><span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{t.unit_adj}</span><span className="text-lg text-white font-bold capitalize">{selectedSlot.replace('front', t.front_l.split(' ')[0]).replace('back', t.back_l.split(' ')[0]).replace('_', ' ')}</span></div><button onClick={() => setSelectedSlot(null)} className="bg-slate-800 p-1.5 rounded-full text-slate-400 hover:bg-slate-700"><X size={18} /></button></div>
                         <div><div className="flex justify-between items-center mb-1.5"><div className="text-[10px] text-slate-500 uppercase font-bold">{t.base_power_setup}</div><button onClick={() => modifyUnit(selectedSlot, { basePower: 0 })} className="px-2 py-0.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-800/50"><RotateCcw size={10} className="inline mr-1" />{t.reset_base}</button></div><div className="flex flex-wrap gap-1.5">{BASE_PRESETS.map(preset => (<button key={preset.val} onClick={() => modifyUnit(selectedSlot, { basePower: preset.val })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 text-slate-300 text-xs font-mono rounded hover:bg-blue-900/30 hover:border-blue-500/50 hover:text-white transition-colors">{preset.label}</button>))}</div></div>
-                        <div className="flex items-center gap-2"><input type="number" value={customBasePower} onChange={(e) => setCustomBasePower(e.target.value)} className="w-full bg-black/50 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-slate-700 focus:border-blue-500" placeholder={t.custom_value} /><button onClick={() => { const val = parseInt(customBasePower); if (!isNaN(val) && val >= 0) { modifyUnit(selectedSlot, { basePower: val }); } setCustomBasePower(""); }} className="flex-shrink-0 bg-yellow-900/30 text-yellow-400 text-xs font-bold rounded py-1 px-3 border border-yellow-900/50">{t.set_base}</button></div>
+                        <div className="flex items-center gap-2"><input type="number" value={customBasePower} onChange={(e) => setCustomBasePower(e.target.value)} className="w-full min-w-0 bg-black/50 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-slate-700 focus:border-blue-500" placeholder={t.custom_value} /><button onClick={() => { const val = parseInt(customBasePower); if (!isNaN(val) && val >= 0) { modifyUnit(selectedSlot, { basePower: val }); } setCustomBasePower(""); }} className="flex-shrink-0 bg-yellow-900/30 text-yellow-400 text-xs font-bold rounded py-1 px-3 border border-yellow-900/50">{t.set_base}</button></div>
 
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
