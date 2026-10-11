@@ -8,7 +8,7 @@ import {
 
 // --- Constants & Data ---
 const MAX_ENERGY = 10;
-const STORAGE_KEY = 'VG_COMBAT_STATE_V20_LOCAL'; // 本地存储使用的键
+const STORAGE_KEY = 'VG_OFFICIAL_PREVIEW_V1'; // 本地存储使用的键
 
 
 const INITIAL_UNIT = {
@@ -121,6 +121,7 @@ const INITIAL_GAME_STATE = {
     attackCount: 0,
     attackHistory: [],
     isMultiSupportMode: false,
+    personaBonus: 0,
 };
 
 // Sanitize legacy saves before rendering. Every slot must have numeric fields.
@@ -144,6 +145,7 @@ const normalizeState = (raw = {}) => {
         unit.crit = Math.max(0, unit.crit);
         for (const key of ['isRested', 'isSupporting', 'isBackRowAttack', 'hasIntercept', 'hasDoubleStrike', 'hasTripleStrike', 'otActive']) unit[key] = unit[key] === true;
         unit.isVanguard = slot === 'front_center';
+        unit.isFrontRow = slot.startsWith('front');
         return [slot, unit];
     }));
     const resources = { ...INITIAL_RESOURCES, ...raw.resources };
@@ -151,10 +153,11 @@ const normalizeState = (raw = {}) => {
         resources[key] = key === 'sentinelActive' ? !!resources[key] : Math.max(0, finite(resources[key], INITIAL_RESOURCES[key]));
     }
     return { ...INITIAL_GAME_STATE, ...raw, units, resources,
+        personaBonus: Math.max(0, finite(raw.personaBonus)),
         energy: Math.max(0, Math.min(MAX_ENERGY, finite(raw.energy))),
         attackCount: Math.max(0, finite(raw.attackCount)),
         extraCounters: Array.isArray(raw.extraCounters) ? raw.extraCounters.filter(c => c && typeof c === 'object').map(c => ({ name: String(c.name ?? ''), value: finite(c.value) })) : [],
-        attackHistory: Array.isArray(raw.attackHistory) ? raw.attackHistory.filter(h => h && h.units).slice(-100).map(h => ({ units: normalizeState({ units: h.units }).units, attackCount: finite(h.attackCount) })) : [],
+        attackHistory: Array.isArray(raw.attackHistory) ? raw.attackHistory.filter(h => h && h.units).slice(-100).map(h => ({ ...h, units: normalizeState({ units: h.units }).units, attackCount: finite(h.attackCount) })) : [],
     };
 };
 const cloneUnits = (units) => Object.fromEntries(Object.entries(units).map(([key, unit]) => [key, { ...unit }]));
@@ -418,7 +421,10 @@ const TRANSLATIONS = {
 export default function App() {
     const [loading, setLoading] = useState(true);
     const [gameState, setGameState] = useState(INITIAL_GAME_STATE);
-    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [selectedSlot, setSelectedSlot] = useState('front_center');
+    const [showUnitDetails, setShowUnitDetails] = useState(false);
+    const [actionNotice, setActionNotice] = useState('');
+    const [healChoice, setHealChoice] = useState(null);
     const [swapMode, setSwapMode] = useState(false);
     const [swapSource, setSwapSource] = useState(null);
     const [showTools, setShowTools] = useState(false);
@@ -460,7 +466,7 @@ export default function App() {
 
     const t = TRANSLATIONS[language] || TRANSLATIONS.zh;
 
-    const getUnitPower = (unit) => (unit?.basePower || 0) + (unit?.powerBuff || 0);
+    const getUnitPower = (unit) => (unit?.basePower || 0) + (unit?.powerBuff || 0) + (unit?.isFrontRow && (unit.basePower || unit.powerBuff) ? gameState.personaBonus : 0);
 
     // 计算单位的 G 级别将由 detectGradeFromPower 决定（基于可编辑的 GRADE_PRESETS）
 
@@ -526,24 +532,53 @@ export default function App() {
     };
 
     useEffect(() => {
-        if (!selectedSlot && !showTools) return;
-        const previous = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
         const close = (event) => {
-            if (event.key === 'Escape') { setSelectedSlot(null); setShowTools(false); setShowAttackAdjust(false); }
-            if (event.key === 'Tab') {
-                const dialog = document.querySelector(selectedSlot ? '.unit-drawer' : '.tools-panel');
-                const controls = [...(dialog?.querySelectorAll('button:not([disabled]), input') || [])];
-                const first = controls[0], last = controls[controls.length - 1];
-                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-            }
+            if (event.key === 'Escape') { setShowUnitDetails(false); setShowTools(false); setShowAttackAdjust(false); setHealChoice(null); }
         };
-        const previousFocus = document.activeElement;
-        document.querySelector(selectedSlot ? '.unit-drawer button[aria-label="Close unit"]' : '.tools-panel button')?.focus();
         document.addEventListener('keydown', close);
-        return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', close); previousFocus?.focus(); };
-    }, [selectedSlot, showTools]);
+        return () => document.removeEventListener('keydown', close);
+    }, []);
+
+    // Quick actions use the latest state and share undo snapshots with attacks.
+    const commitQuickAction = (changes) => {
+        const current = stateRef.current;
+        const snapshot = { units: cloneUnits(current.units), resources: { ...current.resources }, personaBonus: current.personaBonus, attackCount: current.attackCount };
+        updateState({ ...changes, attackHistory: [...current.attackHistory, snapshot].slice(-100) });
+    };
+    const slotLabel = (slot) => ({ front_left: t.front_l, front_center: t.vanguard, front_right: t.front_r, back_left: t.back_l, back_center: t.back_c, back_right: t.back_r })[slot];
+    const quickPower = (slot, value, call = false) => {
+        const current = stateRef.current;
+        const unit = current.units[slot];
+        const next = call ? { ...unit, basePower: value, grade: value === 8000 ? 1 : 2, isSupporting: slot.startsWith('back') && value === 8000 && !unit.isRested } : { ...unit, powerBuff: unit.powerBuff + value };
+        commitQuickAction({ units: { ...current.units, [slot]: next } });
+        setSelectedSlot(slot); setShowUnitDetails(false); setHealChoice(null); setActionNotice('');
+    };
+    const activatePersona = () => {
+        if (stateRef.current.personaBonus) return;
+        commitQuickAction({ personaBonus: 10000 });
+        setActionNotice(language === 'zh' ? 'Persona Ride：前列本回合 +10,000，请实体抽 1 张。' : 'Persona Ride: front row +10,000. Draw 1 card.');
+    };
+    const applyTrigger = (kind, heal = false, target = selectedSlot || 'front_center') => {
+        const current = stateRef.current;
+        const resource = { crit: 'critTriggers', draw: 'drawTriggers', front: 'frontTriggers', heal: 'healTriggers', ot: 'otTriggers' }[kind];
+        if (current.resources[resource] <= 0) return;
+        const units = cloneUnits(current.units);
+        if (kind !== 'front' && !(units[target].basePower || units[target].powerBuff)) { setActionNotice('请先选择场上单位。'); return; }
+        if (kind === 'heal' && heal === null) { setHealChoice(target); setActionNotice('你的伤害是否不少于对手？满足条件才能回复 1 点。'); return; }
+        if (kind === 'front') {
+            for (const slot of ['front_left', 'front_center', 'front_right']) {
+                if (units[slot].basePower || units[slot].powerBuff) units[slot].powerBuff += 10000;
+            }
+        } else {
+            units[target].powerBuff += kind === 'ot' ? OT_BUFF_VALUE : 10000;
+            if (kind === 'crit') units[target].crit += 1;
+            if (kind === 'ot') units[target].otActive = true;
+        }
+        const resources = { ...current.resources, [resource]: current.resources[resource] - 1 };
+        if (kind === 'heal' && heal && resources.damage > 0) resources.damage -= 1;
+        commitQuickAction({ units, resources }); setHealChoice(null);
+        setActionNotice(kind === 'draw' ? '已加力量；请实体抽 1 张。' : kind === 'ot' ? '已加 1 亿力量；请除外 OT、抽 1 张并处理卡片追加效果。' : kind === 'crit' ? '力量与暴击已给当前单位；分开分配可在单位编辑中调整。' : '');
+    };
 
     // --- Logic ---
     const vanguardUnit = gameState.units.front_center || INITIAL_UNIT;
@@ -677,9 +712,11 @@ export default function App() {
         updateState({
             units: lastState.units,
             attackCount: lastState.attackCount,
-            attackHistory: newHistory
+            attackHistory: newHistory,
+            ...(lastState.resources ? { resources: lastState.resources } : {}),
+            ...(lastState.personaBonus !== undefined ? { personaBonus: lastState.personaBonus } : {}),
         });
-        setSelectedSlot(null);
+        setShowUnitDetails(false); setActionNotice(''); setHealChoice(null);
     };
 
     const attackColumn = (frontSlot, backSlot, explicitAttackerSlot) => {
@@ -740,7 +777,7 @@ export default function App() {
         });
 
         Object.values(newUnits).forEach(unit => { unit.powerBuff = 0; unit.otActive = false; unit.crit = 1; });
-        updateState({ units: newUnits, attackCount: 0, attackHistory: [], resources: { ...gameState.resources, shield: 0, sentinelActive: false } });
+        updateState({ units: newUnits, personaBonus: 0, attackCount: 0, attackHistory: [], resources: { ...gameState.resources, shield: 0, sentinelActive: false } });
         setSelectedSlot(null);
     };
 
@@ -787,7 +824,7 @@ export default function App() {
             unit.crit = 1; // 重置暴击倍数
             // 不修改 isRested 和 isSupporting，保持当前状态
         });
-        updateState({ units: newUnits, attackCount: 0, attackHistory: [] });
+        updateState({ units: newUnits, personaBonus: 0, attackCount: 0, attackHistory: [] });
         setSelectedSlot(null);
     };
 
@@ -848,7 +885,7 @@ export default function App() {
         } else {
             setCustomBasePower(''); setManualInput('');
             setShowTools(false); setShowAttackAdjust(false);
-            setSelectedSlot(selectedSlot === slot ? null : slot);
+            setSelectedSlot(slot); setShowUnitDetails(false); setHealChoice(null); setActionNotice('');
         }
     };
 
@@ -905,7 +942,7 @@ export default function App() {
         const newUnits = cloneUnits(stateRef.current.units);
         slots.forEach(slot => {
             const unit = newUnits[slot];
-            unit.powerBuff += value;
+            if (unit.basePower || unit.powerBuff) unit.powerBuff += value;
         });
         updateState({ units: newUnits });
     };
@@ -935,143 +972,32 @@ export default function App() {
 
     const renderUnitSlot = (id, label) => {
         const unit = gameState.units[id] || INITIAL_UNIT;
-        const isSelected = selectedSlot === id;
-        const isSwapSource = swapSource === id;
-        const isVanguardSlot = id === 'front_center';
-
-        // 3. 检查是否可支援：后列 或 (前列 且 多重支援开启)
-        const isFrontRow = id.startsWith('front');
-        // Vanguard (front_center) cannot be supported manually — remove its support button
-        const isSupportable = !isVanguardSlot && (id.startsWith('back') || (isFrontRow && gameState.isMultiSupportMode));
-
-        const totalPower = getUnitPower(unit);
-        const totalPowerDisplay = formatNumber(totalPower);
-
-        let borderClass = "border-slate-800";
-        let bgClass = "bg-slate-900/80";
-
-        if (isVanguardSlot) {
-            borderClass = "border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]";
-            bgClass = "bg-red-950/20";
-        }
-
-        if (unit.isRested) {
-            bgClass = "bg-slate-950/90 opacity-40";
-            borderClass = "border-slate-900";
-        } else if (unit.isSupporting && totalPower > 0) {
-            bgClass = "bg-green-900/20 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]";
-        }
-
-        if (swapMode) {
-            if (isSwapSource) {
-                borderClass = "border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.6)]";
-                bgClass = "bg-blue-900/20";
-            } else {
-                borderClass = "border-dashed border-slate-600 hover:border-blue-400 cursor-crosshair";
-            }
-        } else if (isSelected) {
-            bgClass = "bg-slate-800";
-            borderClass = "border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.3)]";
-        }
-
-        let powerTextClass = "text-3xl";
-        if (totalPower.toString().length > 6) powerTextClass = "text-xl";
-        if (totalPower.toString().length > 8) powerTextClass = "text-lg";
-
-        // NEW: Apply rainbow class for OT
-        const isOTPower = !!unit.otActive;
-
-        let powerTextColor = isOTPower
-            ? "rainbow-text" // Use the rainbow class for OT
-            : (isVanguardSlot
-                ? "text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.6)]"
-                : (totalPower > 0 ? "text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" : (totalPower < 0 ? "text-red-500" : "text-slate-400"))
-            );
-
+        const power = getUnitPower(unit);
+        const occupied = !!(unit.basePower || unit.powerBuff);
+        const isVanguard = id === 'front_center';
+        const isSupportable = !isVanguard && (id.startsWith('back') || gameState.isMultiSupportMode);
         return (
-            <div
-                data-testid={`unit-${id}`}
-                onClick={() => handleSlotClick(id)}
-                className={`
-                    relative flex flex-col items-center justify-center p-1 pt-4 rounded-lg border-2
-                    transition-all duration-200 h-[140px] sm:h-[150px] select-none backdrop-blur-sm overflow-hidden
-                    ${isOTPower ? 'rainbow-glow' : ''} ${borderClass} ${bgClass}
-                `}
-            >
-                {unit.isRested && <Anchor size={16} className="absolute top-1 right-1 text-slate-500" />}
-                {unit.isSupporting && totalPower > 0 && <Layers size={16} className="absolute top-1 right-1 text-green-400" />}
-
-                {isSupportable && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); toggleSupport(id); }}
-                        disabled={unit.isRested || totalPower === 0}
-                        className={`absolute top-1 left-1 px-2 py-0.5 rounded text-[10px] font-bold transition-colors z-10
-                    ${unit.isRested || totalPower === 0
-                                ? 'bg-slate-900 text-slate-700 cursor-not-allowed'
-                                : unit.isBackRowAttack
-                                    ? 'bg-red-700/70 text-white hover:bg-red-600/90'
-                                    : unit.isSupporting
-                                        ? 'bg-green-700/70 text-white hover:bg-green-600/90'
-                                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/70'
-                            }
-                `}
-                    >
-                        <Layers size={10} className="inline mr-1" />
-                        {unit.isRested || totalPower === 0
-                            ? ''
-                            : unit.isBackRowAttack
-                                ? t.back_row_attack_mode
-                                : (unit.isSupporting ? t.support_off : t.support_on)}
-                    </button>
-                )}
-
-                <span className={`absolute top-1 left-2 text-[9px] uppercase font-bold tracking-widest opacity-70 ${isVanguardSlot ? 'text-red-400' : 'text-slate-500'}`}>
-                    {label}
-                </span>
-                <button
-                    onClick={(e) => { e.stopPropagation(); handleSlotClick(id); }}
-                    aria-label={`${label} ${t.edit_grade}`}
-                    className="absolute top-1 right-2 text-[9px] bg-slate-900/60 px-2 py-1 rounded text-xs font-mono border border-slate-800 hover:border-yellow-400"
-                >{getGradeLabel(unit)}</button>
-
-                <div className="z-10 flex flex-col items-center mt-3 w-full px-1">
-                    <span className={`${powerTextClass} font-black tracking-tighter font-mono ${powerTextColor} break-all text-center leading-none whitespace-nowrap`}>
-                        {totalPowerDisplay}
-                    </span>
-                    {/* Improved Layout for Base/Buff Details: Stacked vertically */}
-                    <div className="flex flex-col items-center w-full mt-1">
-                        <div className="flex items-center gap-1 text-[9px] text-slate-500 leading-tight">
-                            <span>{t.base_short}:</span>
-                            <span className="font-mono">{formatNumber(unit.basePower)}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[9px] text-slate-400 leading-tight">
-                            <span>{t.buff_short}:</span>
-                            <span className="font-mono">{unit.powerBuff >= 0 ? '+' : ''}{formatNumber(unit.powerBuff)}</span>
-                        </div>
-                    </div>
+            <article data-testid={`unit-${id}`} className={`field-unit ${isVanguard ? 'vanguard-unit' : 'rear-unit'} ${selectedSlot === id ? 'unit-selected' : ''} ${unit.isRested ? 'unit-rested' : ''} ${swapSource === id ? 'swap-source' : ''}`}>
+                <span className="official-circle" aria-hidden="true" /><div className="unit-heading"><span>{label}</span><button aria-label={`${label} ${t.edit_grade}`} onClick={() => { setSelectedSlot(id); setShowUnitDetails(!showUnitDetails || selectedSlot !== id); setShowTools(false); }} className="grade-button">G{unit.grade}<span aria-hidden="true">⌁</span></button></div>
+                <button type="button" className="unit-select" aria-label={`选择${label}`} aria-pressed={selectedSlot === id} onClick={() => handleSlotClick(id)}>
+                    <span className={`unit-power ${unit.otActive ? 'rainbow-text' : ''} ${String(Math.abs(power)).length > 8 ? 'power-long' : ''}`}>{formatNumber(power)}</span>
+                    <span className="unit-breakdown">{occupied ? `${formatNumber(unit.basePower)} ${unit.powerBuff >= 0 ? '+' : '−'} ${formatNumber(Math.abs(unit.powerBuff))}` : '空位 · 点下方呼叫'}</span>
+                    {unit.isFrontRow && gameState.personaBonus > 0 && occupied && <span className="persona-marker">Persona +10k</span>}
+                </button>
+                <div className="unit-status">
+                    {isSupportable && occupied ? <button aria-label={`${label} 支援模式`} onClick={() => toggleSupport(id)} disabled={unit.isRested}>{unit.isBackRowAttack ? '后排攻击' : unit.isSupporting ? '支援中' : '支援关闭'}</button> : <span>{unit.isRested ? '横置' : unit.hasTripleStrike ? '三判' : unit.hasDoubleStrike ? '双判' : unit.hasIntercept ? '截击' : isVanguard ? 'Vanguard' : 'Rear-guard'}</span>}
+                    <span className="unit-critical">★ {unit.crit}</span>
                 </div>
-
-                {(unit.crit !== 1) && (
-                    <div className="absolute bottom-10 right-2 flex items-center gap-1 bg-slate-950 border border-yellow-600/50 px-2 py-0.5 rounded text-xs shadow-lg">
-                        <span className="text-yellow-500">★</span>
-                        <span className="font-bold text-white">{unit.crit}</span>
-                    </div>
-                )}
-
-                {/* 状态标记：支援、截击、双判、三判 */}
-                <div className="absolute bottom-10 left-2 flex items-center gap-1 text-[9px] leading-none">
-                    {unit.isSupporting && <span className="bg-green-700/70 text-white px-1 py-0.5 rounded">{t.boost}</span>}
-                    {unit.hasIntercept && <span className="bg-blue-700/70 text-white px-1 py-0.5 rounded">{t.intercept}</span>}
-                    {unit.hasDoubleStrike && <span className="bg-purple-700/70 text-white px-1 py-0.5 rounded">{t.double_strike}</span>}
-                    {unit.hasTripleStrike && <span className="bg-red-700/70 text-white px-1 py-0.5 rounded">{t.triple_strike}</span>}
+                <div className="unit-quick">
+                    <button aria-label={`${label} ${occupied ? '加5000' : '呼叫8000'}`} onClick={() => quickPower(id, occupied ? 5000 : 8000, !occupied)}>{occupied ? '+5k' : '8k 呼叫'}</button>
+                    <button aria-label={`${label} ${occupied ? '加10000' : '呼叫10000'}`} onClick={() => quickPower(id,10000,!occupied)}>{occupied ? '+10k' : '10k 呼叫'}</button>
                 </div>
-
-                <div className="absolute bottom-0 inset-x-0 grid grid-cols-3 divide-x divide-slate-800 rounded-b-lg overflow-hidden bg-slate-950/70 h-8">
-                    <button onClick={(e) => { e.stopPropagation(); restUnit(id); }} disabled={unit.isRested} className={`text-[9px] font-bold flex items-center justify-center ${unit.isRested ? 'text-slate-700' : 'text-slate-400 hover:bg-slate-800'}`}><Anchor size={10} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); standUnit(id); }} disabled={!unit.isRested} className={`text-[9px] font-bold flex items-center justify-center ${!unit.isRested ? 'text-slate-700' : 'text-slate-400 hover:bg-slate-800'}`}><CornerUpLeft size={10} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); handleRetire(id); }} className="text-[9px] font-bold flex items-center justify-center text-red-500 hover:bg-red-900/30"><Trash2 size={10} /></button>
+                <div className="unit-actions">
+                    <button aria-label={`${label} ${unit.isRested ? '竖置' : '横置'}`} onClick={() => unit.isRested ? standUnit(id) : restUnit(id)}>{unit.isRested ? <CornerUpLeft size={12} /> : <Anchor size={12} />}</button>
+                    <button aria-label={`${label} 减5000`} disabled={!occupied} onClick={() => quickPower(id,-5000)}>−5k</button>
+                    <button aria-label={`${label} 退场`} onClick={() => { const current = stateRef.current; commitQuickAction({ units: { ...current.units, [id]: { ...INITIAL_UNIT, isVanguard, isFrontRow: id.startsWith('front') } } }); setShowUnitDetails(false); }}><Trash2 size={12} /></button>
                 </div>
-            </div>
+            </article>
         );
     };
 
@@ -1162,11 +1088,11 @@ export default function App() {
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-cyan-500 font-mono tracking-widest">{t.system_booting}</div>;
 
     return (
-        <div className="min-h-screen bg-black text-slate-200 font-sans pb-20 overflow-x-hidden" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e293b 0%, #020617 100%)' }}>
+        <div className="vg-app min-h-screen bg-black text-slate-200 font-sans pb-20 overflow-x-hidden" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e293b 0%, #020617 100%)' }}>
             <header className="bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 py-2 flex justify-between items-center shadow-xl sticky top-0 z-40">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-5 bg-cyan-500 rounded-sm shadow-[0_0_8px_#06b6d4]"></div>
-                    <h1 className="font-bold text-base tracking-widest text-white font-mono">{t.app_name}<span className="text-cyan-500 text-xs ml-1">OS</span></h1>
+                    <h1 className="font-bold text-base tracking-widest text-white">先导者<span className="brand-os">OS</span></h1>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="relative">
@@ -1190,7 +1116,7 @@ export default function App() {
             </header>
             {storageWarning && <p role="status" className="p-3 text-amber-300">本地保存失败，当前操作仍可继续；请保持页面打开。</p>}
             {showTools && (
-                <div role="dialog" aria-label={t.language} className="tools-panel mx-4 mt-2 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-2xl mb-4">
+                <div role="region" aria-label={t.language} className="tools-panel mx-4 mt-2 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-2xl mb-4">
                     <div className="tools-heading flex justify-end"><button aria-label="Close settings" onClick={() => setShowTools(false)} className="p-2"><X size={20} /></button></div>
                     <div className="border-b border-slate-800 pb-2 mb-3">
                         <div className="flex justify-between text-[10px] text-cyan-500 mb-2 uppercase tracking-wider items-center"><Globe size={12} className="mr-1" />{t.language}</div>
@@ -1251,12 +1177,12 @@ export default function App() {
                     </div>
                 </div>
             )}
-            <main className="p-3 max-w-md mx-auto space-y-4">
-                <section>
+            <main id="fight-field" className="fight-main p-3 max-w-md mx-auto space-y-4">
+                <section className="battle-field">
                     {/* Top Controls Grid: 2 Rows */}
                     <div className="flex flex-col gap-2 mb-2">
                         {/* Row 1: Attack Actions */}
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="turn-controls grid grid-cols-4 gap-1.5">
                             {/* 回合状态重置 (Round Reset) */}
                             <button onClick={roundStateReset} className="py-1.5 bg-red-800/50 text-red-300 border border-red-700 rounded-lg font-bold text-xs hover:bg-red-700/70 transition-colors flex items-center justify-center gap-1"><RefreshCcw size={12} /> {t.round_reset}</button>
                             {/* 回合开始 (Turn Start - Ride + 3 EN) */}
@@ -1265,7 +1191,7 @@ export default function App() {
                             <button onClick={handleAttackUndo} disabled={gameState.attackHistory.length === 0} className={`py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-1 border ${gameState.attackHistory.length === 0 ? 'bg-slate-900 text-slate-700 border-slate-800 cursor-not-allowed opacity-50' : 'bg-yellow-800/50 text-yellow-300 border-yellow-700 hover:bg-yellow-700/70'}`}><CornerUpLeft size={12} /> {t.undo_attack}</button>
                         </div>
                         {/* NEW Row 2: Support Mode & Front Buff */}
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="field-controls grid grid-cols-3 gap-1.5">
                             <button
                                 onClick={() => updateState({ isMultiSupportMode: !gameState.isMultiSupportMode })}
                                 className={`py-1.5 rounded-lg font-bold text-xs transition-all border flex items-center justify-center gap-1 ${gameState.isMultiSupportMode
@@ -1276,32 +1202,124 @@ export default function App() {
                                 <Users size={14} /> {gameState.isMultiSupportMode ? t.multi_support : t.std_support}
                             </button>
                             <button onClick={() => applyFrontRowBuff(10000)} className="py-1.5 bg-purple-700/50 text-purple-300 border border-purple-600 rounded-lg font-bold text-xs hover:bg-purple-600/70 transition-colors flex items-center justify-center gap-1"><ChevronsUp size={14} /> {t.front_buff}</button>
-                        </div>
-                        {/* Row 3: Formation */}
-                        <div className="grid grid-cols-1">
-                            <button onClick={() => { setSwapMode(!swapMode); setSwapSource(null); setSelectedSlot(null); }} className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all border ${swapMode ? 'bg-blue-600 text-white border-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.5)]' : 'bg-slate-900 text-slate-400 border-slate-700 hover:border-slate-500'}`}><Move size={12} /> {swapMode ? t.move_on : t.move_mode}</button>
+                            <button className={`persona-button ${gameState.personaBonus ? 'persona-on' : ''}`} aria-pressed={!!gameState.personaBonus} onClick={activatePersona} disabled={!!gameState.personaBonus}>Persona Ride<span>{gameState.personaBonus ? '已生效 +10k' : '前列 +10k'}</span></button>
                         </div>
                     </div>
+                    <div className="trigger-buttons" aria-label="判定快捷操作">
+                        {[['crit','暴击','★','critTriggers'],['draw','抽牌','↥','drawTriggers'],['front','前列','↑↑','frontTriggers'],['heal','治愈','✚','healTriggers'],['ot','超','OT','otTriggers']].map(([kind,label,icon,key]) => <button key={kind} className={`trigger-${kind}`} disabled={gameState.resources[key] <= 0} onClick={() => applyTrigger(kind,kind === 'heal' ? null : false)}><span aria-hidden="true">{icon}</span>{label}<small>{gameState.resources[key]}</small></button>)}
+                    </div>
+                    <div className="field-selection"><span>当前：<strong>{slotLabel(selectedSlot || 'front_center')}</strong></span><button aria-pressed={swapMode} onClick={() => { setSwapMode(!swapMode); setSwapSource(null); setShowUnitDetails(false); }}>{swapMode ? '换位中 · 点两个格子' : '换位'}</button></div>
+                    {actionNotice && <div className="action-notice" role="status">{actionNotice}{!healChoice && <button aria-label="关闭提示" onClick={() => setActionNotice('')}>×</button>}</div>}
+                    {healChoice && <div className="heal-choice"><button onClick={() => applyTrigger('heal',true,healChoice)}>满足，回复 1 点</button><button onClick={() => applyTrigger('heal',false,healChoice)}>不满足，仅加力量</button><button onClick={() => { setHealChoice(null); setActionNotice(''); }}>取消</button></div>}
 
                     <div className="grid grid-cols-3 gap-2">
                         <div className="flex flex-col gap-2">{renderUnitSlot('front_left', t.front_l)}{renderUnitSlot('back_left', t.back_l)}<TotalPowerDisplay frontId="front_left" backId="back_left" /><ColumnAttackButton frontId="front_left" backId="back_left" attackHandler={attackColumn} /></div>
                         <div className="flex flex-col gap-2">{renderUnitSlot('front_center', t.vanguard)}{renderUnitSlot('back_center', t.back_c)}<TotalPowerDisplay frontId="front_center" backId="back_center" /><ColumnAttackButton frontId="front_center" backId="back_center" attackHandler={attackColumn} /></div>
                         <div className="flex flex-col gap-2">{renderUnitSlot('front_right', t.front_r)}{renderUnitSlot('back_right', t.back_r)}<TotalPowerDisplay frontId="front_right" backId="back_right" /><ColumnAttackButton frontId="front_right" backId="back_right" attackHandler={attackColumn} /></div>
                     </div>
+            {selectedSlot && showUnitDetails && !swapMode && (
+                <div className="unit-editor">
+                <div role="region" aria-label={t.unit_adj} className="unit-drawer">
+                    <div className="drawer-content p-4 max-w-md mx-auto space-y-4">
+                        <div className="drawer-heading flex justify-between items-center border-b border-slate-800 pb-2"><div className="flex flex-col"><span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{t.unit_adj}</span><span className="text-lg text-white font-bold capitalize">{slotLabel(selectedSlot)}</span></div><button aria-label="Close unit" onClick={() => setShowUnitDetails(false)} className="bg-slate-800 p-1.5 rounded-full text-slate-400 hover:bg-slate-700"><X size={18} /></button></div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <label className="text-xs text-slate-400" htmlFor="unit-grade">{t.edit_grade}</label>
+                            <input id="unit-grade" type="number" min="0" value={gameState.units[selectedSlot].grade} onChange={e => modifyUnit(selectedSlot, { grade: Math.max(0, finite(e.target.value)) })} className="w-16 bg-slate-800 border border-slate-700 rounded px-2" />
+                            {[0, 1, 2, 3].map(grade => <button key={grade} onClick={() => modifyUnit(selectedSlot, { grade })} className="px-3 rounded bg-slate-800 text-xs">G{grade}</button>)}
+                        </div>
+                        <div><div className="flex justify-between items-center mb-1.5"><div className="text-[10px] text-slate-500 uppercase font-bold">{t.base_power_setup}</div><button onClick={() => modifyUnit(selectedSlot, { basePower: 0 })} className="px-2 py-0.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-800/50"><RotateCcw size={10} className="inline mr-1" />{t.reset_base}</button></div><div className="flex flex-wrap gap-1.5">{BASE_PRESETS.map(preset => (<button key={preset.val} onClick={() => modifyUnit(selectedSlot, { basePower: preset.val })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 text-slate-300 text-xs font-mono rounded hover:bg-blue-900/30 hover:border-blue-500/50 hover:text-white transition-colors">{preset.label}</button>))}</div></div>
+                        <div className="flex items-center gap-2"><input type="number" value={customBasePower} onChange={(e) => setCustomBasePower(e.target.value)} className="w-full min-w-0 bg-black/50 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-slate-700 focus:border-blue-500" aria-label={t.custom_value} placeholder={t.custom_value} /><button onClick={() => { const val = parseInt(customBasePower); if (!isNaN(val) && val >= 0) { modifyUnit(selectedSlot, { basePower: val }); } setCustomBasePower(""); }} className="flex-shrink-0 bg-yellow-900/30 text-yellow-400 text-xs font-bold rounded py-1 px-3 border border-yellow-900/50">{t.set_base}</button></div>
+
+                        <div>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <div className="text-[10px] text-slate-500 uppercase font-bold">{t.power_buff_adj}</div>
+                                <button onClick={() => modifyUnit(selectedSlot, { powerBuff: 0, otActive: false })} className="px-2 py-0.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-800/50"><RotateCcw size={10} className="inline mr-1" />{t.reset_buff}</button>
+                            </div>
+
+                            {/* 增益/减益按钮网格 (3列 x 2行) */}
+                            <div className="grid grid-cols-3 gap-2">
+                                {/* Positive Buffs */}
+                                {POS_NEG_BUFF_BUTTONS.slice(0, 3).map((btn, i) => (
+                                    <button key={i} onClick={() => modifyUnit(selectedSlot, { powerBuff: gameState.units[selectedSlot].powerBuff + btn.value })} className={`${btn.color} border py-2.5 rounded font-bold text-xs shadow-sm active:scale-95 transition-transform`}>{btn[`label_${language}`]}</button>
+                                ))}
+                                {/* Negative Buffs */}
+                                {POS_NEG_BUFF_BUTTONS.slice(3).map((btn, i) => (
+                                    <button key={i + 3} onClick={() => modifyUnit(selectedSlot, { powerBuff: gameState.units[selectedSlot].powerBuff + btn.value })} className={`${btn.color} border py-2.5 rounded font-bold text-xs shadow-sm active:scale-95 transition-transform`}>{btn[`label_${language}`]}</button>
+                                ))}
+                            </div>
+
+                            {/* 独立的 OT 按钮 - 炫酷彩色效果 */}
+                            <button
+                                onClick={handleOTBuff}
+                                className={`ot-button-style w-full mt-3 py-3 rounded font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-all ${hasAnyOT ? 'ot-active' : 'ot-inactive'}`}
+                            >
+                                {t.ot} ({formatNumber(OT_BUFF_VALUE)})
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-slate-900 p-2 rounded border border-slate-800 flex flex-col justify-between">
+                                <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">{t.manual_buff}</div>
+                                <div className="flex gap-1">
+                                    <input type="number" value={manualInput} onChange={(e) => setManualInput(e.target.value)} className="w-full bg-black/50 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-slate-700 focus:border-blue-500" aria-label={t.manual_buff} placeholder="10,000…" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-1 mt-1">
+                                    <button onClick={() => { const val = parseInt(manualInput); if (manualInput && !isNaN(val)) { modifyUnit(selectedSlot, { powerBuff: gameState.units[selectedSlot].powerBuff + val }); } setManualInput(""); }} className="bg-cyan-900/30 text-cyan-400 text-xs font-bold rounded py-1 border border-cyan-900/50">+</button>
+                                    <button onClick={() => { const val = parseInt(manualInput); if (manualInput && !isNaN(val)) { modifyUnit(selectedSlot, { powerBuff: gameState.units[selectedSlot].powerBuff - val }); } setManualInput(""); }} className="bg-red-900/30 text-red-400 text-xs font-bold rounded py-1 border border-red-900/50">-</button>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded p-1">
+                                <button onClick={() => modifyUnit(selectedSlot, { crit: gameState.units[selectedSlot].crit - 1 })} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-red-400 rounded">-</button>
+                                <div className="flex flex-col items-center leading-none">
+                                    <span className="text-[8px] text-slate-500 uppercase">{t.crit_full}</span>
+                                    <span className="text-yellow-500 font-bold text-lg">★{gameState.units[selectedSlot].crit}</span>
+                                </div>
+                                <button onClick={() => modifyUnit(selectedSlot, { crit: gameState.units[selectedSlot].crit + 1 })} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-yellow-400 rounded">+</button>
+                            </div>
+                        </div>
+
+                        {/* 新增：状态标记切换按钮 */}
+                        <div className="border-t border-slate-700 pt-3">
+                            <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">状态标记</div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => modifyUnit(selectedSlot, { hasIntercept: !gameState.units[selectedSlot].hasIntercept })}
+                                    className={`py-2 rounded font-bold text-xs border transition-all ${gameState.units[selectedSlot].hasIntercept ? 'bg-blue-700/50 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+                                >
+                                    {t.intercept}
+                                </button>
+                                <button
+                                    onClick={() => modifyUnit(selectedSlot, { hasDoubleStrike: !gameState.units[selectedSlot].hasDoubleStrike, hasTripleStrike: false })}
+                                    className={`py-2 rounded font-bold text-xs border transition-all ${gameState.units[selectedSlot].hasDoubleStrike ? 'bg-purple-700/50 text-white border-purple-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+                                >
+                                    {t.double_strike}
+                                </button>
+                                <button
+                                    onClick={() => modifyUnit(selectedSlot, { hasTripleStrike: !gameState.units[selectedSlot].hasTripleStrike, hasDoubleStrike: false })}
+                                    className={`py-2 rounded font-bold text-xs border transition-all ${gameState.units[selectedSlot].hasTripleStrike ? 'bg-red-700/50 text-white border-red-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+                                >
+                                    {t.triple_strike}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            )}
                 </section>
-                <section className="bg-slate-900/50 border border-slate-700 rounded-xl p-3">
+                <section className="energy-panel bg-slate-900/50 border border-slate-700 rounded-xl p-3">
                     <div className="flex justify-between items-end mb-2 border-b border-slate-800 pb-2"><h2 className="text-[10px] font-bold text-cyan-500 uppercase tracking-[0.2em] flex items-center gap-1"><Zap size={12} /> {t.energy}</h2><div className="text-2xl font-black text-white font-mono leading-none text-shadow-neon">{gameState.energy} / {MAX_ENERGY}</div></div>
                     <div className="flex justify-between gap-0.5 h-8 items-center px-1 mb-3 relative">
                         <div className="absolute left-1 right-1 h-0.5 bg-slate-800 top-1/2 -translate-y-1/2 z-0"></div>
-                        {Array.from({ length: 11 }).map((_, i) => (<button key={i} onClick={() => setEnergy(i)} className={`relative z-10 rounded-full flex items-center justify-center transition-all ${i <= gameState.energy ? 'w-4 h-4 bg-cyan-500 shadow-[0_0_8px_#06b6d4]' : 'w-2 h-2 bg-slate-800 hover:bg-slate-700'}`}>{i <= gameState.energy && <div className="w-1 h-1 bg-white rounded-full"></div>}</button>))}
+                        {Array.from({ length: 11 }).map((_, i) => (<button key={i} aria-label={`能量 ${i}`} aria-pressed={i === gameState.energy} onClick={() => setEnergy(i)} className={`relative z-10 rounded-full flex items-center justify-center transition-all ${i <= gameState.energy ? 'w-4 h-4 bg-cyan-500 shadow-[0_0_8px_#06b6d4]' : 'w-2 h-2 bg-slate-800 hover:bg-slate-700'}`}>{i <= gameState.energy && <div className="w-1 h-1 bg-white rounded-full"></div>}</button>))}
                     </div>
-                    <div className="grid grid-cols-6 gap-1.5">{ENERGY_ACTIONS.map(action => (<button key={action.label_zh} onClick={() => setEnergy(gameState.energy + action.value)} className={`${action.color} border border-cyan-800/50 rounded py-1 text-[10px] font-bold`}>{action[`label_${language}`]}</button>))}</div>
+                    <div className="grid grid-cols-6 gap-1.5">{ENERGY_ACTIONS.map(action => (<button key={action.label_zh} onClick={() => setEnergy(action.value === -100 ? 0 : stateRef.current.energy + action.value)} className={`${action.color} border border-cyan-800/50 rounded py-1 text-[10px] font-bold`}>{action[`label_${language}`]}</button>))}</div>
                 </section>
                 <section className="grid grid-cols-2 gap-2">
                     <div className="bg-slate-900/60 border border-blue-900/30 rounded-lg p-2 flex flex-col">
                         <div className="flex justify-between items-center mb-1"><div className="text-[10px] text-blue-400 uppercase font-bold flex items-center gap-1"><Shield size={10} /> {t.g_shield}</div><div className="text-2xl font-mono font-black text-white">{formatNumber(currentGuard)}</div></div>
                         {/* Opponent ATK Input (Existing) */}
-                        <div className="mb-2"><input type="number" value={opponentAttackPower === null ? '' : opponentAttackPower} onChange={(e) => { const val = e.target.value; if (val === '') { setOpponentAttackPower(null); } else { const parsedVal = parseInt(val); setOpponentAttackPower(!isNaN(parsedVal) && parsedVal >= 0 ? parsedVal : 0); } }} placeholder={t.opponent_atk} className="w-full bg-blue-950/30 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-blue-800 focus:border-cyan-400" /></div>
+                        <div className="mb-2"><input type="number" value={opponentAttackPower === null ? '' : opponentAttackPower} onChange={(e) => { const val = e.target.value; if (val === '') { setOpponentAttackPower(null); } else { const parsedVal = parseInt(val); setOpponentAttackPower(!isNaN(parsedVal) && parsedVal >= 0 ? parsedVal : 0); } }} aria-label={t.opponent_atk} placeholder={t.opponent_atk} className="w-full bg-blue-950/30 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-blue-800 focus:border-cyan-400" /></div>
 
                         {/* 差异计算区域 */}
                         {currentAttackTarget > 0 && (<div className="bg-blue-950/20 border-b border-blue-800/50 p-1 mb-2"><div className="text-[9px] text-slate-400 flex justify-between"><span>{isDifferenceMode ? `${t.base_diff} (${t.opponent_atk} ${formatNumber(currentAttackTarget)} - ${t.vanguard} ${formatNumber(vanguardPower)}):` : `${t.base_diff} (${t.vanguard} ATK):`}</span><span className="font-mono text-yellow-400">{formatNumber(Math.max(0, currentAttackTarget - vanguardPower))}</span></div><div className="text-[9px] text-slate-400 flex justify-between border-t border-slate-800/50 mt-1 pt-1"><span>{t.current_g}</span><span className="font-mono text-blue-300 font-bold">{formatNumber(currentGuard)}</span></div>{required5kIncrements > 0 ? (<div className="text-[11px] text-red-400 font-bold flex justify-between mt-1 pt-1 border-t border-red-900/30"><span>{t.required_g_inc}</span><span className="font-mono">{required5kIncrements}</span></div>) : (<div className="text-[11px] text-green-400 font-bold flex justify-center mt-1 pt-1 border-t border-green-900/30"><span>{t.guard_success}</span></div>)}</div>)}
@@ -1387,95 +1405,6 @@ export default function App() {
                     </div>
                 </section>
             </main>
-            {selectedSlot && !swapMode && (
-                <div className="drawer-backdrop" onClick={() => setSelectedSlot(null)}>
-                <div role="dialog" aria-modal="true" aria-label={t.unit_adj} onClick={e => e.stopPropagation()} className="unit-drawer fixed bottom-0 inset-x-0 bg-[#0b1120] border-t border-slate-700 rounded-t-2xl shadow-[0_-5px_50px_rgba(0,0,0,0.9)] z-50 animate-in slide-in-from-bottom duration-200">
-                    <div className="drawer-content p-4 max-w-md mx-auto space-y-4">
-                        <div className="drawer-heading flex justify-between items-center border-b border-slate-800 pb-2"><div className="flex flex-col"><span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{t.unit_adj}</span><span className="text-lg text-white font-bold capitalize">{selectedSlot.replace('front', t.front_l.split(' ')[0]).replace('back', t.back_l.split(' ')[0]).replace('_', ' ')}</span></div><button aria-label="Close unit" onClick={() => setSelectedSlot(null)} className="bg-slate-800 p-1.5 rounded-full text-slate-400 hover:bg-slate-700"><X size={18} /></button></div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <label className="text-xs text-slate-400" htmlFor="unit-grade">{t.edit_grade}</label>
-                            <input id="unit-grade" type="number" min="0" value={gameState.units[selectedSlot].grade} onChange={e => modifyUnit(selectedSlot, { grade: Math.max(0, finite(e.target.value)) })} className="w-16 bg-slate-800 border border-slate-700 rounded px-2" />
-                            {[0, 1, 2, 3].map(grade => <button key={grade} onClick={() => modifyUnit(selectedSlot, { grade })} className="px-3 rounded bg-slate-800 text-xs">G{grade}</button>)}
-                        </div>
-                        <div><div className="flex justify-between items-center mb-1.5"><div className="text-[10px] text-slate-500 uppercase font-bold">{t.base_power_setup}</div><button onClick={() => modifyUnit(selectedSlot, { basePower: 0 })} className="px-2 py-0.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-800/50"><RotateCcw size={10} className="inline mr-1" />{t.reset_base}</button></div><div className="flex flex-wrap gap-1.5">{BASE_PRESETS.map(preset => (<button key={preset.val} onClick={() => modifyUnit(selectedSlot, { basePower: preset.val })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 text-slate-300 text-xs font-mono rounded hover:bg-blue-900/30 hover:border-blue-500/50 hover:text-white transition-colors">{preset.label}</button>))}</div></div>
-                        <div className="flex items-center gap-2"><input type="number" value={customBasePower} onChange={(e) => setCustomBasePower(e.target.value)} className="w-full min-w-0 bg-black/50 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-slate-700 focus:border-blue-500" placeholder={t.custom_value} /><button onClick={() => { const val = parseInt(customBasePower); if (!isNaN(val) && val >= 0) { modifyUnit(selectedSlot, { basePower: val }); } setCustomBasePower(""); }} className="flex-shrink-0 bg-yellow-900/30 text-yellow-400 text-xs font-bold rounded py-1 px-3 border border-yellow-900/50">{t.set_base}</button></div>
-
-                        <div>
-                            <div className="flex justify-between items-center mb-1.5">
-                                <div className="text-[10px] text-slate-500 uppercase font-bold">{t.power_buff_adj}</div>
-                                <button onClick={() => modifyUnit(selectedSlot, { powerBuff: 0, otActive: false })} className="px-2 py-0.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-800/50"><RotateCcw size={10} className="inline mr-1" />{t.reset_buff}</button>
-                            </div>
-
-                            {/* 增益/减益按钮网格 (3列 x 2行) */}
-                            <div className="grid grid-cols-3 gap-2">
-                                {/* Positive Buffs */}
-                                {POS_NEG_BUFF_BUTTONS.slice(0, 3).map((btn, i) => (
-                                    <button key={i} onClick={() => modifyUnit(selectedSlot, { powerBuff: gameState.units[selectedSlot].powerBuff + btn.value })} className={`${btn.color} border py-2.5 rounded font-bold text-xs shadow-sm active:scale-95 transition-transform`}>{btn[`label_${language}`]}</button>
-                                ))}
-                                {/* Negative Buffs */}
-                                {POS_NEG_BUFF_BUTTONS.slice(3).map((btn, i) => (
-                                    <button key={i + 3} onClick={() => modifyUnit(selectedSlot, { powerBuff: gameState.units[selectedSlot].powerBuff + btn.value })} className={`${btn.color} border py-2.5 rounded font-bold text-xs shadow-sm active:scale-95 transition-transform`}>{btn[`label_${language}`]}</button>
-                                ))}
-                            </div>
-
-                            {/* 独立的 OT 按钮 - 炫酷彩色效果 */}
-                            <button
-                                onClick={handleOTBuff}
-                                className={`ot-button-style w-full mt-3 py-3 rounded font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-all ${hasAnyOT ? 'ot-active' : 'ot-inactive'}`}
-                            >
-                                {t.ot} ({formatNumber(OT_BUFF_VALUE)})
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-slate-900 p-2 rounded border border-slate-800 flex flex-col justify-between">
-                                <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">{t.manual_buff}</div>
-                                <div className="flex gap-1">
-                                    <input type="number" value={manualInput} onChange={(e) => setManualInput(e.target.value)} className="w-full bg-black/50 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-slate-700 focus:border-blue-500" placeholder="e.g. 10000" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-1 mt-1">
-                                    <button onClick={() => { const val = parseInt(manualInput); if (manualInput && !isNaN(val)) { modifyUnit(selectedSlot, { powerBuff: gameState.units[selectedSlot].powerBuff + val }); } setManualInput(""); }} className="bg-cyan-900/30 text-cyan-400 text-xs font-bold rounded py-1 border border-cyan-900/50">+</button>
-                                    <button onClick={() => { const val = parseInt(manualInput); if (manualInput && !isNaN(val)) { modifyUnit(selectedSlot, { powerBuff: gameState.units[selectedSlot].powerBuff - val }); } setManualInput(""); }} className="bg-red-900/30 text-red-400 text-xs font-bold rounded py-1 border border-red-900/50">-</button>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded p-1">
-                                <button onClick={() => modifyUnit(selectedSlot, { crit: gameState.units[selectedSlot].crit - 1 })} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-red-400 rounded">-</button>
-                                <div className="flex flex-col items-center leading-none">
-                                    <span className="text-[8px] text-slate-500 uppercase">{t.crit_full}</span>
-                                    <span className="text-yellow-500 font-bold text-lg">★{gameState.units[selectedSlot].crit}</span>
-                                </div>
-                                <button onClick={() => modifyUnit(selectedSlot, { crit: gameState.units[selectedSlot].crit + 1 })} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-yellow-400 rounded">+</button>
-                            </div>
-                        </div>
-
-                        {/* 新增：状态标记切换按钮 */}
-                        <div className="border-t border-slate-700 pt-3">
-                            <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">状态标记</div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    onClick={() => modifyUnit(selectedSlot, { hasIntercept: !gameState.units[selectedSlot].hasIntercept })}
-                                    className={`py-2 rounded font-bold text-xs border transition-all ${gameState.units[selectedSlot].hasIntercept ? 'bg-blue-700/50 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
-                                >
-                                    {t.intercept}
-                                </button>
-                                <button
-                                    onClick={() => modifyUnit(selectedSlot, { hasDoubleStrike: !gameState.units[selectedSlot].hasDoubleStrike, hasTripleStrike: false })}
-                                    className={`py-2 rounded font-bold text-xs border transition-all ${gameState.units[selectedSlot].hasDoubleStrike ? 'bg-purple-700/50 text-white border-purple-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
-                                >
-                                    {t.double_strike}
-                                </button>
-                                <button
-                                    onClick={() => modifyUnit(selectedSlot, { hasTripleStrike: !gameState.units[selectedSlot].hasTripleStrike, hasDoubleStrike: false })}
-                                    className={`py-2 rounded font-bold text-xs border transition-all ${gameState.units[selectedSlot].hasTripleStrike ? 'bg-red-700/50 text-white border-red-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
-                                >
-                                    {t.triple_strike}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                </div>
-            )}
             <style>{`
                 /* 霓虹阴影效果 */
                 .text-shadow-neon { text-shadow: 0 0 8px rgba(6,182,212, 0.6); }
