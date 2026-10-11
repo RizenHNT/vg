@@ -5,10 +5,17 @@ const KEY = 'VG_OFFICIAL_PREVIEW_V1';
 const entry = readFileSync('dist/index.html', 'utf8').match(/src="\/([^"]+\.js)"/)[1];
 const code = readFileSync('dist/' + entry, 'utf8');
 const wait = () => new Promise(r => setTimeout(r, 30));
-async function boot(save) {
+async function boot(save, measureNumbers = false) {
   const errors = [];
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://vg.test', runScripts: 'outside-only', pretendToBeVisual: true });
   dom.window.console.error = (...args) => errors.push(args.join(' '));
+  const resizeCallbacks=[];
+  let fontWidthFactor=.62;
+  if(measureNumbers){
+    dom.window.ResizeObserver=class {constructor(cb){resizeCallbacks.push(cb)} observe(){} disconnect(){}};
+    Object.defineProperty(dom.window.HTMLElement.prototype,'clientWidth',{get(){return this.classList.contains('power-fit') ? 86 : 0}});
+    dom.window.HTMLElement.prototype.getBoundingClientRect=function(){const size=parseFloat(this.style.fontSize)||34;return {width:this.classList.contains('power-value') ? this.textContent.length*size*fontWidthFactor : 86};};
+  }
   if (save !== undefined) dom.window.localStorage.setItem(KEY, typeof save === 'string' ? save : JSON.stringify(save));
   dom.window.eval(code); await wait();
   const doc = dom.window.document;
@@ -17,25 +24,26 @@ async function boot(save) {
     const button = [...scope.querySelectorAll('button')].find(b => b.textContent.trim() === text);
     assert.ok(button, 'button ' + text); assert.ok(!button.disabled, text + ' enabled'); button.click(); await wait();
   };
-  return { dom, doc, click, state, errors };
+  return { dom, doc, click, state, errors, fontLoaded(){fontWidthFactor=.42;resizeCallbacks.forEach(cb=>cb());} };
 }
 (async () => {
   let x = await boot();
   await x.click('Ride 升级'); assert.equal(x.state().units.front_center.grade, 1);
   await x.click('回合开始'); assert.equal(x.state().units.front_center.grade, 1); assert.equal(x.state().energy, 0);
   x.doc.querySelector('[aria-label="选择先导者"]').click(); await wait();
-  assert.ok(!x.doc.querySelector('.unit-editor')); assert.equal(x.doc.body.style.overflow, '');
+  assert.ok(x.doc.querySelector('.unit-editor')); assert.equal(x.doc.body.style.overflow, '');
   x.doc.querySelector('[aria-label="先导者 编辑 G"]').click(); await wait();
   let drawer = x.doc.querySelector('.unit-editor'); assert.ok(drawer); assert.equal(x.doc.body.style.overflow, '');
-  await x.click('+10k', drawer); await x.click('OT (100,000,000)', drawer);
+  await x.click('修正'); await x.click('+10k', drawer); await x.click('OT 开关', drawer);
   assert.equal(x.state().units.front_center.powerBuff, 100010000);
-  await x.click('OT (100,000,000)', drawer); assert.equal(x.state().units.front_center.powerBuff, 10000);
+  await x.click('OT 开关', drawer); assert.equal(x.state().units.front_center.powerBuff, 10000);
   x.doc.dispatchEvent(new x.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
-  assert.ok(!x.doc.querySelector('.unit-editor')); assert.equal(x.doc.body.style.overflow, '');
+  assert.ok(x.doc.querySelector('.unit-editor')); assert.equal(x.doc.body.style.overflow, '');
   await x.click('攻击 (V)'); assert.equal(x.state().attackCount, 1);
-  await x.click('前列 +10k'); const before = x.state().attackHistory[0].units.front_center.powerBuff;
+  x.doc.querySelector('.trigger-front').click(); await wait(); const before = x.state().attackHistory.at(-2).units.front_center.powerBuff;
   assert.equal(before, 10000, 'history snapshot is immutable');
-  await x.click('撤回'); assert.equal(x.state().units.front_center.powerBuff, 10000); assert.equal(x.state().attackCount, 0);
+  await x.click('撤回'); assert.equal(x.state().units.front_center.powerBuff, 10000); assert.equal(x.state().attackCount, 1);
+  await x.click('撤回'); assert.equal(x.state().attackCount, 0);
   await x.click('PG (4)'); assert.equal(x.state().resources.shield, 0); assert.equal(x.state().resources.sentinelActive, true);
   await x.click('PG 取消'); assert.equal(x.state().resources.sentinelsRemaining, 4);
   assert.equal(x.errors.length, 0, x.errors.join('\n')); x.dom.window.close();
@@ -70,31 +78,47 @@ async function boot(save) {
   }
   // All six units stay directly selectable without menus or focus changes.
   x = await boot();
-  for (const button of x.doc.querySelectorAll('.unit-select')) { button.click(); await wait(); assert.ok(!x.doc.querySelector('.unit-editor')); assert.equal(x.doc.body.style.overflow, ''); }
+  const editor=x.doc.querySelector('.unit-editor');
+  for (const button of x.doc.querySelectorAll('.unit-select')) { button.click(); await wait(); assert.equal(x.doc.querySelector('.unit-editor'),editor); assert.equal(x.doc.body.style.overflow, ''); }
   assert.equal(x.doc.querySelectorAll('.energy-panel button[aria-label^="能量 "]').length, 11);
-  await x.click('10k 呼叫',x.doc.querySelector('[data-testid="unit-front_left"]'));
-  await x.click('8k 呼叫',x.doc.querySelector('[data-testid="unit-back_left"]'));
-  const quick = x.doc.querySelector('[data-testid="unit-front_left"] .unit-quick button');
+  x.doc.querySelector('[aria-label="选择前列 L"]').click();await wait();await x.click('10k',x.doc.querySelector('.base-actions'));
+  x.doc.querySelector('[aria-label="选择后列 L"]').click();await wait();await x.click('8k',x.doc.querySelector('.base-actions'));
+  x.doc.querySelector('[aria-label="选择前列 L"]').click();await wait();await x.click('修正');
+  const quick = [...x.doc.querySelectorAll('.buff-actions button')].find(b=>b.textContent==='+5k');
   for(let i=0;i<20;i++) quick.click(); await wait();
   assert.equal(x.state().units.front_left.powerBuff,100000,'rapid clicks use latest state');
   await x.click('撤回'); assert.equal(x.state().units.front_left.powerBuff,95000);
   x.doc.querySelector('.persona-button').click(); await wait();
   assert.equal(x.state().personaBonus,10000);
   assert.equal(x.state().units.front_right.powerBuff,0,'Persona does not create units');
-  await x.click('10k 呼叫',x.doc.querySelector('[data-testid="unit-front_right"]'));
+  x.doc.querySelector('[aria-label="选择前列 R"]').click();await wait();await x.click('10k',x.doc.querySelector('.base-actions'));
   assert.equal(x.doc.querySelector('[data-testid="unit-front_right"] .unit-power').textContent,'20,000','later front calls receive Persona');
   x.doc.querySelector('.trigger-front').click(); await wait();
   assert.equal(x.state().units.front_right.powerBuff,10000); assert.equal(x.state().units.back_left.powerBuff,0);
-  assert.equal(x.state().resources.frontTriggers,2);
+  assert.equal(x.state().resources.frontTriggers,3,'numeric shortcuts do not require tracking physical cards');
   x.doc.querySelector('[aria-label="选择先导者"]').click(); await wait();
   x.doc.querySelector('.trigger-crit').click(); await wait();
-  assert.equal(x.state().units.front_center.crit,2); assert.equal(x.state().resources.critTriggers,3);
+  assert.equal(x.state().units.front_center.crit,2); assert.equal(x.state().resources.critTriggers,4);
   await x.click('撤回'); assert.equal(x.state().units.front_center.crit,1); assert.equal(x.state().resources.critTriggers,4);
   const damageBefore=x.state().resources.damage;
   x.doc.querySelector('.trigger-heal').click(); await wait();
-  assert.equal(x.state().resources.healTriggers,4,'heal prompt makes no premature state change');
-  await x.click('不满足，仅加力量'); assert.equal(x.state().resources.damage,damageBefore); assert.equal(x.state().resources.healTriggers,3);
+  assert.equal(x.state().resources.healTriggers,4);assert.equal(x.state().resources.damage,damageBefore,'physical damage zone stays manual');
   await x.click('回合开始'); assert.equal(x.state().personaBonus,0);
   assert.equal(x.errors.length,0,x.errors.join('\n'));x.dom.window.close();
-  console.log('PASS: ride/turn separation, OT additive toggle, inline editor, direct six-slot controls, rapid clicks, trigger undo, Persona timing, heal confirmation, undo snapshot, PG toggle, 4 guard boundaries, 3 legacy-save recoveries.');
+  // The full editor remains available, while optional counters stay collapsed.
+  x=await boot({units:{front_left:{basePower:10000}}});
+  assert.ok(!x.doc.querySelector('.optional-counters').open);
+  assert.ok(![...x.doc.querySelectorAll('button')].some(b=>b.textContent.trim()==='前列 +10k'));
+  assert.equal(x.doc.querySelectorAll('.unit-quick').length,0,'one shared edit bank instead of six duplicate banks');
+  x.doc.querySelector('[aria-label="选择前列 L"]').click();await wait();await x.click('状态');await x.click('截击',x.doc.querySelector('.state-actions'));await x.click('三判',x.doc.querySelector('.state-actions'));
+  assert.equal(x.state().units.front_left.hasIntercept,true);assert.equal(x.state().units.front_left.hasTripleStrike,true);
+  await x.click('基础 / G');const grade=x.doc.querySelector('#unit-grade');Object.getOwnPropertyDescriptor(x.dom.window.HTMLInputElement.prototype,'value').set.call(grade,'10');grade.dispatchEvent(new x.dom.window.Event('input',{bubbles:true}));await wait();assert.equal(x.state().units.front_left.grade,10);
+  await x.click('修正');await x.click('-15k',x.doc.querySelector('.buff-actions'));assert.equal(x.state().units.front_left.powerBuff,-15000);
+  assert.equal(x.errors.length,0,x.errors.join('\n'));x.dom.window.close();
+  // Exercise measured fitting against wide fallback glyphs and a late font change.
+  x=await boot({units:{front_center:{basePower:13000,powerBuff:100000000,otActive:true}}},true);
+  for(const span of x.doc.querySelectorAll('.unit-power .power-value,.column-power .power-value'))assert.ok(span.getBoundingClientRect().width<=84,'long total fits the measured narrow cell');
+  x.fontLoaded();for(const span of x.doc.querySelectorAll('.unit-power .power-value,.column-power .power-value'))assert.ok(span.getBoundingClientRect().width<=84,'fit remains valid after font change');
+  assert.equal(x.errors.length,0,x.errors.join('\n'));x.dom.window.close();
+  console.log('PASS: persistent full editor, six-slot selection, grade/status/custom controls, rapid edits and undo, Persona/front distinction, physical-zone independence, measured OT/fallback-font fitting, PG toggle, guard boundaries and legacy-save recovery.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,38 +1,35 @@
-# 官方牌桌风格 · 隔离预览
+# 蓝色牌桌 · 隔离审阅
 
-本分支从已恢复的原版 `2fcaf2e` 创建。未修改 main，未替换正式站。
+从原版 `2fcaf2e` 开始，独立分支 `design/official-playmat-preview`。不合入 main，不替换正式站；存档键为 `VG_OFFICIAL_PREVIEW_V1`。
 
 ## 视觉依据
 
-使用用户提供的官方牌桌参考：三列两排单位，中心蓝色 V 法阵，五个黄绿色 R 法阵；黑色底、细线环形几何、紧凑而醒目的粗数字。`public/reference-playmat.jpg` 是用户提供的第二张图片，保持原始内容，通过 CSS 定位显示法阵；两个 SVG 是参照图片绘制的辅助线条，非官方独立素材。
+保留三列两排牌桌、蓝色底色。参考用户提供的牌桌图：中心蓝色 V 法阵、其他 R 法阵、细线环与醒目的窄体数字。`public/reference-playmat.jpg` 为用户提供的第二张图片；辅助 SVG 由代码绘制，不标称官方独立素材。
 
-颜色：底色 #050b15；面板 #0b192b；边框 #34526b；蓝色 #89d3ff；黄色 #f3de86；辅助字 #a3b3c3。
+数值字体 Barlow Condensed 800，辅助数值 600，本地加载并附 OFL。中文使用系统黑体。长数字按实际字宽与容器宽度适配，字体加载和容器变化后重新计算；基础值、修正值分别显示，不在窄格内拼长公式。
 
-字体：数值用 Barlow Condensed 800，按钮数值用 600，本地加载并附 OFL；中文用系统黑体（PingFang SC / Microsoft YaHei / system-ui）。对比过 Rajdhani，最终选择更接近参考图数值比例的 Barlow Condensed。不把装饰字体用于中文操作说明。
+## 操作结构
 
-## 技能与素材来源
+- 六格用于看力量、基础、修正、G、暴击与支援状态。保留支援切换，去除每格重复的加数银行。
+- 常用回合开始、Ride、Persona Ride 位于一行。Persona 不再与一个相同文字的前列加数快捷键并列。
+- 一个持续可见的单位编辑面板随所选格子切换。修正页含正负预设、五色判定、暴击、清修正与自定义数值/OT 开关；基础页含七个预设、自定义值、G0–G3 和任意 G；状态页含横置/站立、截击、双判、三判、支援/后排攻击和退场。没有遮罩或选择后的滚动跳转。
+- EN 保留圆形轨道 0–10；可点击区域和可见圆点分开，不把圆点变成方形按钮。
+- 防御计算保留并使用整行宽度。魂、伤和牌库计数作为收起的可选计数工具；语言、骰子、硬币、G 预设、多重支援与回合重置位于设置。
+- 主界面不输出抽牌、魂区或治愈流程说明。判定只执行力量/暴击计算，不要求同步实体牌数或伤害区。暴击的力量与暴击默认给同一单位，仍可用各格修正与暴击调整拆分。
 
-- Frontend Design：https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md
-- Web Design Guidelines：https://github.com/vercel-labs/agent-skills/blob/main/skills/web-design-guidelines/SKILL.md
-- 审查规范：https://github.com/vercel-labs/web-interface-guidelines/blob/main/command.md
-- 字体及许可证：https://github.com/google/fonts/tree/main/ofl/barlowcondensed
-- 官方牌桌说明：https://cf-vanguard.com/howto/first_guide/menu02/
-- 官方 First Guide：https://en.cf-vanguard.com/wordpress/wp-content/uploads/VGD-First-Guide.pdf
+## 规则与验证边界
 
-官方页面在本次环境中下载返回 404，未伪称已取得高清原始法阵。实际使用的是用户上传的参考图，辅助 SVG 由代码绘制。
+Persona 加成与单位的前列位置绑定，包括后来进入前列的单位；前判加成记录到判定处理时已有的前列单位。回合开始和回合重置清临时加成。OT 只记基础力量加成，卡片额外效果自行调整。
 
-## 操作层级
+构建与实际编译产物的 DOM 回归覆盖编辑功能、连续操作、撤回、Persona/前判区别、存档恢复、PG、防御边界及长数字在宽备用字体与字体切换下的适配。DOM 测试不是手机浏览器像素验收。当前浏览器无法访问本地文件，Vercel 隔离部署有登录保护；不宣称已完成真机显示验收。
 
-常用：六格直接选择；每格 +5k / +10k、−5k；空位 8k / 10k 呼叫；横置与竖置；攻击与撤回；E 能量；Persona Ride；五种判定。
+## 设计资料
 
-偶尔使用：G 等级、基础值、自定义数值、暴击分配、状态标记。点击格子的 G 按钮，在场地下方展开编辑，不覆盖单位。
+- https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md
+- https://github.com/vercel-labs/agent-skills/blob/main/skills/web-design-guidelines/SKILL.md
+- https://github.com/vercel-labs/web-interface-guidelines/blob/main/command.md
+- https://github.com/google/fonts/tree/main/ofl/barlowcondensed
+- https://en.cf-vanguard.com/howto/d-series/
+- https://en.cf-vanguard.com/howto/v-series/
 
-低频：语言、骰子、硬币、等级预设、自定义计数器，保留在设置中，使用正常文档流。
-
-## 预览隔离
-
-独立分支和预览部署。使用 `VG_OFFICIAL_PREVIEW_V1` 存档键。预览不写入原版存档，不切换生产域名。用户明确认可后才可以合入。
-
-## 规则边界
-
-Persona Ride 的前列加成包括本回合后来呼叫的单位，并在回合开始/状态重置时清除；实体抽牌通过提示处理。前触发仅处理当时已有的前列单位。治愈先确认伤害条件，不满足仍加力量。暴击的力量和暴击默认给当前单位，可以通过编辑分别调整。OT 的力量被记录，卡片追加效果仍需按卡文处理。
+官方规则页搜索索引可查；当前环境直接读取返回 404。图片实际使用用户上传参考，不声称获得官方高清素材下载。

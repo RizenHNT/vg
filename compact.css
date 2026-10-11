@@ -1,0 +1,97 @@
+[hidden]{display:none!important}
+.vg-app{background:#07111f!important}
+.fight-main{padding:8px 10px 18px}
+.fight-main>section,.fight-main>details{margin-top:9px!important}
+.fight-main>section:first-child{margin-top:0!important}
+.turn-controls{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:5px}
+.turn-controls button{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:35px;border:1px solid #365c7a;border-radius:5px;background:#122840;color:#bddfff;font-size:12px;font-weight:600;white-space:nowrap}
+.turn-controls .persona-button{display:flex;flex-direction:row;background:#142f4f;border-color:#477cad}
+.persona-button span{margin:0;color:#99e7c0}
+.turn-controls .persona-on{opacity:1;border-color:#78bce2;background:#1b3b5b}
+.field-selection{min-height:27px;height:27px;font-size:10px;color:#8faac3;padding:0 1px}
+.field-selection button{min-width:50px;height:27px;color:#b4cfe6;text-align:right;padding:0}
+.battle-field>.grid{gap:6px}
+.battle-field>.grid>.flex{gap:6px;min-width:0}
+.field-unit{height:132px}
+.field-unit::before,.official-circle{width:118px;height:118px;top:4px}
+.official-circle{background-size:647px 647px;background-position:-146px -507px}
+.vanguard-unit .official-circle{background-position:-271px -392px}
+.unit-heading{height:25px;padding:0 5px;font-size:10px}
+.grade-button{gap:4px;min-width:30px;height:25px;padding:0 2px;font-size:14px}
+.persona-marker{color:#8bd3ff;font-size:11px}
+.unit-select{top:25px;bottom:27px;min-width:0;width:100%;padding:0 5px;justify-content:center;background:linear-gradient(transparent,#071420cd 22%,#071420cd 77%,transparent)}
+.power-fit{display:flex;min-width:0;width:100%;justify-content:center;align-items:center;line-height:1.05;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:0}
+.power-value{display:inline-block;flex:none;white-space:nowrap;line-height:1.05}
+.unit-power{font-size:inherit;letter-spacing:0;margin-bottom:4px}
+.unit-power.ot-power{color:#e0c5ff}
+.unit-meta{width:100%;display:flex;flex-direction:column;gap:1px;font-size:10px;color:#a6bdd0;line-height:1.1}
+.unit-meta>span{display:flex;align-items:center;justify-content:center;gap:5px}
+.unit-meta .power-fit{width:auto;flex:0 1 auto;max-width:calc(100% - 21px);font-weight:600}
+.unit-status{bottom:0;left:0;right:0;height:27px;padding:0 5px;font-size:10px;color:#aac1d2;background:#081323cf;border-top:1px solid #2a435850}
+.unit-status>button{min-width:42px;height:26px;color:#8fe3b1;text-align:left;background:transparent;font-size:11px;padding:0}
+.unit-critical{color:#e6d58f;font-size:12px}
+.unit-critical small{font-size:10px;color:#a5cadc}
+.battle-field>.grid>.flex>.h-10{height:38px;min-width:0;padding:2px 4px}
+.battle-field>.grid>.flex>button{min-height:32px;padding:4px 1px;font-size:10px;min-width:0;border-color:#3b6785;background:#122b43;color:#b7dfff}
+.battle-field>.grid>.flex>button svg{width:11px;height:11px;margin-right:1px}
+.unit-editor{margin-top:9px;border:1px solid #365d7c;border-radius:5px;background:#0b1b2c;min-width:0;overflow:visible}
+.editor-heading{display:flex;justify-content:space-between;align-items:center;height:31px;padding:0 8px;border-bottom:1px solid #243e54;font-size:12px;color:#bbe5ff}
+.editor-heading strong{font-weight:600}
+.undo-button{display:flex;align-items:center;gap:4px;font-size:11px;color:#d3c58f;min-height:30px;min-width:50px;justify-content:flex-end}
+.editor-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#071424}
+.editor-tabs button{font-size:11px;color:#91acc2;height:30px;border-bottom:2px solid transparent}
+.editor-tabs button[aria-selected=true]{color:#c8edff;border-bottom-color:#7cd9ff;background:#16304a}
+.unit-editor [role=tabpanel]{padding:7px 8px;min-height:147px}
+.buff-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.buff-actions button,.base-actions button,.grade-actions button,.base-custom button,.state-actions button{display:flex;align-items:center;justify-content:center;min-width:0;min-height:30px;border:1px solid #2b526f;border-radius:4px;color:#b6e5ff;background:#142f49;font-size:12px;font-weight:600}
+.buff-actions .negative{background:#0d2033;color:#a0bed4;border-color:#294459}
+.trigger-buttons{gap:4px;margin-top:6px}
+.trigger-buttons button{gap:3px;min-width:0;height:31px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap}
+.trigger-buttons button>span{font-size:13px}
+.crit-actions{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-height:30px;margin-top:4px;color:#ead991;font-size:12px}
+.crit-actions>button:not(.quiet-button){min-width:30px;height:29px;background:#14283c;border-radius:3px;font-size:15px;color:#bce4ff}
+.crit-actions>span{min-width:34px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:600}
+.crit-actions .quiet-button{margin-left:auto;color:#89a9c1;font-size:10px;min-height:29px;padding:0 3px}
+.custom-power{font-size:10px;color:#a6bfd4}
+.custom-power summary{min-height:29px;display:flex;align-items:center;cursor:pointer;padding:0 3px}
+.custom-power[open]{width:100%;border-top:1px solid #253e54}
+.custom-power>div{display:flex;gap:4px}
+.custom-power input{min-width:0;flex:1}
+.custom-power button{background:#14304a;border:1px solid #355979;border-radius:3px;min-width:32px;padding:0 5px}
+.base-actions{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.base-actions button{font-family:'Barlow Condensed',sans-serif;font-size:15px}
+.grade-actions{display:flex;align-items:center;gap:4px;margin-top:7px;font-size:12px;color:#9dbbd1}
+.grade-actions input{width:52px;min-width:0}
+.grade-actions button{flex:1;font-family:'Barlow Condensed',sans-serif;font-size:14px}
+.base-custom{display:flex;gap:4px;margin-top:7px}
+.base-custom input{flex:1;min-width:0}
+.base-custom button{font-size:10px;padding:0 6px}
+.state-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding-top:5px}
+.state-actions button{min-height:40px;font-size:11px;gap:3px}
+.state-actions button[aria-pressed=true]{background:#1b4668;border-color:#75b6df;color:#e0f4ff}
+.state-actions .retire-button{background:#291e2b;border-color:#664759;color:#e4a9b5}
+.energy-panel{border-radius:6px!important;padding:8px 10px!important}
+.energy-panel .text-2xl{font-size:26px}
+.energy-panel .mb-2{margin-bottom:0;border:0;padding-bottom:0}
+.energy-rail{position:relative;display:grid;grid-template-columns:repeat(11,minmax(0,1fr));height:31px}
+.energy-rail::before{content:'';position:absolute;left:4%;right:4%;top:15px;height:1px;background:#294158}
+.energy-rail>button{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;min-width:0;background:transparent;border:0;border-radius:0;padding:0;box-shadow:none}
+.energy-dot{display:flex;align-items:center;justify-content:center;width:8px;height:8px;border-radius:50%;background:#344b5e;box-shadow:0 0 0 4px #0b1b2b}
+.energy-filled{width:16px;height:16px;background:#43b1dc;box-shadow:0 0 5px #42c8f24a}
+.energy-dot i{width:5px;height:5px;border-radius:50%;background:#e0faff}
+.energy-panel>.grid button{min-height:27px;font-size:10px;border-radius:4px}
+.guard-panel{min-width:0}
+.guard-panel>div{border-color:#284967;background:#0b1a2b}
+.guard-panel button{min-height:30px;font-size:11px}
+.guard-panel input{min-width:0}
+.optional-counters{font-size:11px;color:#89a7bf}
+.optional-counters>summary{min-height:32px;padding:7px 0;cursor:pointer}
+.optional-counters>div{margin-top:5px}
+.optional-counters button{min-height:30px;min-width:25px}
+.optional-counters .grid-cols-6{grid-template-columns:repeat(3,minmax(0,1fr))}
+.optional-counters .text-\[8px\]{font-size:10px}
+.settings-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.settings-actions button{border:1px solid #355976;border-radius:4px;background:#142e46;font-size:12px;color:#bedef4}
+input{font-size:16px!important;min-height:32px}
+button:disabled{opacity:.4}
+@media(max-width:350px){.fight-main{padding-left:7px;padding-right:7px}.unit-heading{padding-left:4px;padding-right:3px}.unit-editor [role=tabpanel]{padding-left:6px;padding-right:6px}.base-actions button{font-size:14px}.turn-controls button{font-size:11px}.trigger-buttons button{gap:2px;font-size:10px}.grade-actions{gap:3px}.crit-actions{gap:3px}}
