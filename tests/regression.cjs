@@ -36,6 +36,17 @@ async function boot(save) {
   await x.click('PG (4)'); assert.equal(x.state().resources.shield, 0); assert.equal(x.state().resources.sentinelActive, true);
   await x.click('PG 取消'); assert.equal(x.state().resources.sentinelsRemaining, 4);
   assert.equal(x.errors.length, 0, x.errors.join('\n')); x.dom.window.close();
+  // Grade remains independent of power and survives a reload; back-row preview uses the attacker.
+  x = await boot({ units: { front_center: { basePower: 13000, grade: 2 }, front_left: { basePower: 10000 }, back_left: { basePower: 8000, isBackRowAttack: true } } });
+  assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').textContent.includes('G2'));
+  await x.click('攻击 (后排攻击)'); assert.equal(x.state().units.back_left.isRested, true); assert.equal(x.state().units.front_left.isRested, false);
+  await x.click('撤回'); assert.equal(x.state().units.back_left.isRested, false);
+  await x.click('回合开始'); const saved = x.state(); x.dom.window.close();
+  x = await boot(saved); assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').textContent.includes('G2')); x.dom.window.close();
+  // Storage failure must leave the current game interactive and expose an explicit status.
+  x = await boot();
+  x.dom.window.Storage.prototype.setItem = () => { throw new Error('quota'); };
+  await x.click('Ride 升级'); assert.ok(x.doc.querySelector('[role="status"]')); assert.ok(x.doc.querySelector('header')); x.dom.window.close();
   // Equality requires one additional 5k shield increment, including an exact 5k gap.
   for (const [attack, shield, blocked] of [[13000,0,false],[18000,5000,false],[18000,10000,true],[12000,0,true]]) {
     x = await boot({ units: { front_center: { basePower: 13000, grade: 3 } }, resources: { shield } });
