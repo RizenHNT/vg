@@ -59,6 +59,9 @@ async function boot(save) {
   s=m.patchUnit(s,'back_left',{isBackRowAttack:true,isSupporting:false});assert.equal(m.columnInfo(s,'left').attacker,'back_left');assert.equal(m.columnInfo(s,'left').power,8000);
   // New direct controls work without opening any settings.
   let x=await boot();
+  await x.click('EN 7');assert.equal(x.state().energy,7);assert.equal(x.doc.querySelectorAll('.energy-pips button').length,11);
+  await x.click('-3',x.doc.querySelector('.energy-quick'));assert.equal(x.state().energy,4);
+  await x.click('重置',x.doc.querySelector('.energy-quick'));assert.equal(x.state().energy,0);
   await x.click('V 先导者 +10k');assert.equal(x.state().units.front_center.powerBuff,10000);
   await x.click('Persona Ride');assert.equal(x.state().personaBonus,10000);
   await x.click('前左 召唤 10k');assert.ok(x.doc.querySelector('[data-testid="unit-front_left"]').textContent.includes('20,000'));

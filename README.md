@@ -8,7 +8,7 @@ Mobile-first Cardfight!! Vanguard tabletop counter in Chinese, Japanese and Engl
 - Start turn, Persona Ride and Undo stay at the top. Ride next is directly available for the selected Vanguard.
 - Critical (yellow), Draw (red), Front (blue), Heal (green) and Over (rainbow) have direct buttons below the field. Target and remaining count are explicit.
 - Select a unit to subtract power, adjust critical or stand/rest. Grade, base power, abilities, swapping and retiring expand inline. No modal or drawer hides the field.
-- Damage, soul and energy have direct steppers. Guard mode provides 5k/10k/15k/20k/25k/50k shield buttons and PG.
+- The original blue/cyan visual direction is retained. E / EN has a direct 0–10 segmented indicator and +1/+2/+3/+5/−1/−3/reset shortcuts below the field. Damage and soul have direct steppers. Guard mode provides 5k/10k/15k/20k/25k/50k shield buttons and PG.
 - Rare settings (preset editing, trigger counts, multi-boost, extra counters, dice and new-game reset) expand at the bottom. Existing custom counters remain directly usable.
 
 ## Rules and actions
