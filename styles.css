@@ -15,3 +15,5 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 .selected-actions{display:flex;gap:6px;align-items:center}.ride-button{min-height:44px;font-size:10px;padding:0 7px;color:#b4d5da;border-color:#48656d;background:#21343e}
+.unit-card:before{z-index:0}.unit-select,.unit-power-buttons{position:relative;z-index:1}
+.unit-heading>span:first-child{min-width:0;overflow-wrap:anywhere}.unit-power{max-width:100%}
