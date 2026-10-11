@@ -1,0 +1,1 @@
+module.exports = { content: ['./index.html', './index.jsx'], theme: { extend: {} }, plugins: [], safelist: ['text-blue-400','text-green-400','text-slate-500','text-cyan-400','text-yellow-400','text-red-500'] };

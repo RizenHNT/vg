@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+.drawer-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / .55); }
+.unit-drawer { max-height: 90vh; max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom); }
+.drawer-heading { position: sticky; top: -1rem; z-index: 2; background: #0b1120; padding-top: 1rem; padding-bottom: .75rem; }
+button { touch-action: manipulation; }
+@media (max-width: 640px) {
+  .unit-drawer button { min-height: 44px; }
+  input { font-size: 16px !important; min-height: 40px; }
+  .drawer-content { padding-bottom: 1.5rem; }
+}
+
+.tools-panel { max-height: 85vh; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; }
+.tools-heading { position: sticky; top: -.75rem; z-index: 2; background: #0f172a; }
+.attack-adjust button { min-width: 44px; min-height: 44px; }
+@media (max-width: 640px) {
+ .tools-panel { position: fixed; inset: auto 0 0; margin: 0; z-index: 50; border-radius: 1rem 1rem 0 0; padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+ .tools-panel button { min-height: 44px; }
+}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import './styles.css';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     Sword, Zap, RotateCcw, X, Settings2, Dices, CircleDollarSign,
     Trash2, Move, Shield, Ghost, AlertTriangle, Layers, Crown, CornerUpLeft, Anchor, Plus, Minus, Globe, Users, ChevronsUp,
@@ -20,6 +21,7 @@ const INITIAL_UNIT = {
     isBackRowAttack: false, // 新增：后排可以攻击的模式标记
     grade: 0,
     // 新增：状态标记
+    otActive: false,
     hasIntercept: false,      // 截击
     hasDoubleStrike: false,   // 双判
     hasTripleStrike: false,   // 三判
@@ -82,7 +84,7 @@ const SHIELD_ACTIONS = [
 const ENERGY_ACTIONS = [
     { label_zh: '+1', label_en: '+1', label_ja: '+1', value: 1, color: 'bg-cyan-900/40 text-cyan-400' },
     { label_zh: '+2', label_en: '+2', label_ja: '+2', value: 2, color: 'bg-cyan-900/40 text-cyan-400' },
-    { label_zh: '+3 (Ride)', label_en: '+3 (Ride)', label_ja: '+3 (Ride)', value: 3, color: 'bg-cyan-900/40 text-cyan-400' },
+    { label_zh: '+3 (EN)', label_en: '+3 (EN)', label_ja: '+3 (EN)', value: 3, color: 'bg-cyan-900/40 text-cyan-400' },
     { label_zh: '+5', label_en: '+5', label_ja: '+5', value: 5, color: 'bg-cyan-900/40 text-cyan-400' },
     { label_zh: '-1', label_en: '-1', label_ja: '-1', value: -1, color: 'bg-slate-800 text-slate-400' },
     { label_zh: '清零', label_en: 'Reset', label_ja: 'リセット', value: -100, color: 'bg-red-900/20 text-red-400' },
@@ -104,7 +106,7 @@ const INITIAL_RESOURCES = {
     shield: 0,
     critTriggers: 4,
     drawTriggers: 4,
-    frontTriggers: 4,
+    frontTriggers: 3,
     healTriggers: 4,
     sentinelsRemaining: 4,
     sentinelActive: false,
@@ -120,6 +122,33 @@ const INITIAL_GAME_STATE = {
     attackHistory: [],
     isMultiSupportMode: false,
 };
+
+// Sanitize legacy saves before rendering. Every slot must have numeric fields.
+const finite = (value, fallback = 0) => Number.isFinite(Number(value)) && value !== null ? Number(value) : fallback;
+const normalizeState = (raw = {}) => {
+    if (!raw || typeof raw !== 'object') raw = {};
+    const units = Object.fromEntries(Object.entries(INITIAL_BOARD).map(([slot, initial]) => {
+        const candidate = raw.units?.[slot];
+        const unit = { ...initial, ...(candidate && typeof candidate === 'object' ? candidate : {}) };
+        for (const key of ['basePower', 'powerBuff', 'crit', 'grade']) unit[key] = finite(unit[key], initial[key]);
+        unit.grade = Math.max(0, Math.trunc(unit.grade));
+        unit.crit = Math.max(0, unit.crit);
+        for (const key of ['isRested', 'isSupporting', 'isBackRowAttack', 'hasIntercept', 'hasDoubleStrike', 'hasTripleStrike', 'otActive']) unit[key] = unit[key] === true;
+        unit.isVanguard = slot === 'front_center';
+        return [slot, unit];
+    }));
+    const resources = { ...INITIAL_RESOURCES, ...raw.resources };
+    for (const key of Object.keys(INITIAL_RESOURCES)) {
+        resources[key] = key === 'sentinelActive' ? !!resources[key] : Math.max(0, finite(resources[key], INITIAL_RESOURCES[key]));
+    }
+    return { ...INITIAL_GAME_STATE, ...raw, units, resources,
+        energy: Math.max(0, Math.min(MAX_ENERGY, finite(raw.energy))),
+        attackCount: Math.max(0, finite(raw.attackCount)),
+        extraCounters: Array.isArray(raw.extraCounters) ? raw.extraCounters.filter(c => c && typeof c === 'object').map(c => ({ name: String(c.name ?? ''), value: finite(c.value) })) : [],
+        attackHistory: Array.isArray(raw.attackHistory) ? raw.attackHistory.filter(h => h && h.units).slice(-100).map(h => ({ units: normalizeState({ units: h.units }).units, attackCount: finite(h.attackCount) })) : [],
+    };
+};
+const cloneUnits = (units) => Object.fromEntries(Object.entries(units).map(([key, unit]) => [key, { ...unit }]));
 
 const formatNumber = (num) => {
     if (num === 0) return '0';
@@ -137,6 +166,7 @@ const LANGUAGES = [
 const TRANSLATIONS = {
     zh: {
         app_name: '先导者 OS',
+        ride_next: 'Ride 升级',
         turn_start: '回合开始',
         system_booting: '系统启动中...',
         attack: '攻击',
@@ -216,6 +246,7 @@ const TRANSLATIONS = {
     },
     en: {
         app_name: 'VANGUARD OS',
+        ride_next: 'Ride next',
         turn_start: 'Turn Start',
         system_booting: 'BOOTING...',
         attack: 'ATK',
@@ -295,6 +326,7 @@ const TRANSLATIONS = {
     },
     ja: {
         app_name: 'ヴァンガード OS',
+        ride_next: 'ライド',
         turn_start: 'ターン開始',
         system_booting: '起動中...',
         attack: 'アタック',
@@ -393,14 +425,15 @@ export default function App() {
     const [manualGuardInput, setManualGuardInput] = useState("");
 
     // 新增：存储单位的特殊模式（后排支援/后排攻击）
-    const [unitModes, setUnitModes] = useState({});
+
 
     // 新增：存储单位的 G 级别（可手动调整）
-    const [unitGrades, setUnitGrades] = useState({});
+
+    const stateRef = useRef(gameState);
+    const [storageWarning, setStorageWarning] = useState(false);
 
     // 新增：G 标签编辑模式
-    const [editingGradeSlot, setEditingGradeSlot] = useState(null);
-    const [editingGradeValue, setEditingGradeValue] = useState("");
+
 
     // 操作 G 预设（增加/删除）
     const addGradePreset = (val) => {
@@ -416,7 +449,7 @@ export default function App() {
         updateState({});
     };
 
-    const t = TRANSLATIONS[language];
+    const t = TRANSLATIONS[language] || TRANSLATIONS.zh;
 
     const getUnitPower = (unit) => (unit?.basePower || 0) + (unit?.powerBuff || 0);
 
@@ -433,7 +466,7 @@ export default function App() {
 
     // 新增：获取右上角显示的 G 标签（如"G0-支援"、"G1-截击"）
     const getGradeLabel = (unit) => {
-        const gradeNum = detectGradeFromPower(unit.basePower);
+        const gradeNum = unit.grade;
         const statusLabel = getUnitStatusLabel(unit);
         if (statusLabel) {
             return `G${gradeNum}-${statusLabel}`;
@@ -450,17 +483,11 @@ export default function App() {
             if (persistedState) {
                 const loadedState = JSON.parse(persistedState);
 
-                // 确保所有必要的资源键都存在，以处理从旧版本状态的迁移
-                const loadedResources = { ...INITIAL_RESOURCES, ...loadedState.resources };
-                // 移除旧的 triggersRemaining 键
-                delete loadedResources.triggersRemaining;
-
-                setGameState({
-                    ...INITIAL_GAME_STATE,
-                    ...loadedState,
-                    resources: loadedResources
-                });
-                setLanguage(loadedState.language || 'zh'); // Load language preference
+                const restored = normalizeState(loadedState);
+                GRADE_PRESETS = Array.isArray(loadedState.gradePresets) && loadedState.gradePresets.length ? loadedState.gradePresets.map(v => Math.max(0, finite(v))) : [...DEFAULT_GRADE_PRESETS];
+                stateRef.current = restored;
+                setGameState(restored);
+                setLanguage(TRANSLATIONS[loadedState.language] ? loadedState.language : 'zh');
             }
         } catch (e) {
             console.error("Could not load state from localStorage", e);
@@ -474,22 +501,40 @@ export default function App() {
     }, []);
 
     // 2. Function to update state and save to Local Storage
-    const updateState = async (newData, updateLanguage = false) => {
-        const nextState = { ...gameState, ...newData };
-
-        if (updateLanguage && newData.language) {
-            nextState.language = newData.language;
-            setLanguage(newData.language);
-        }
-
+    const updateState = (newData, updateLanguage = false) => {
+        const nextState = normalizeState({ ...stateRef.current, ...newData });
+        stateRef.current = nextState;
         setGameState(nextState);
-
+        const nextLanguage = updateLanguage && TRANSLATIONS[newData.language] ? newData.language : language;
+        if (updateLanguage) setLanguage(nextLanguage);
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...nextState, language: updateLanguage ? newData.language : language }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...nextState, language: nextLanguage, gradePresets: GRADE_PRESETS }));
+            setStorageWarning(false);
         } catch (e) {
+            setStorageWarning(true);
             console.error("Could not save state to localStorage", e);
         }
     };
+
+    useEffect(() => {
+        if (!selectedSlot && !showTools) return;
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        const close = (event) => {
+            if (event.key === 'Escape') { setSelectedSlot(null); setShowTools(false); setShowAttackAdjust(false); }
+            if (event.key === 'Tab') {
+                const dialog = document.querySelector(selectedSlot ? '.unit-drawer' : '.tools-panel');
+                const controls = [...(dialog?.querySelectorAll('button:not([disabled]), input') || [])];
+                const first = controls[0], last = controls[controls.length - 1];
+                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+            }
+        };
+        const previousFocus = document.activeElement;
+        document.querySelector(selectedSlot ? '.unit-drawer button[aria-label="Close unit"]' : '.tools-panel button')?.focus();
+        document.addEventListener('keydown', close);
+        return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', close); previousFocus?.focus(); };
+    }, [selectedSlot, showTools]);
 
     // --- Logic ---
     const vanguardUnit = gameState.units.front_center || INITIAL_UNIT;
@@ -497,33 +542,22 @@ export default function App() {
     const currentGuard = gameState.resources.shield;
 
     const { required5kIncrements, currentAttackTarget, isDifferenceMode } = useMemo(() => {
-        let targetATK = 0;
-        let effectiveTarget = 0;
-        const isManualInput = (opponentAttackPower != null && opponentAttackPower > 0);
-
-        if (isManualInput) {
-            targetATK = opponentAttackPower;
-            effectiveTarget = Math.max(0, targetATK - vanguardPower);
-        } else {
-            targetATK = vanguardPower;
-            effectiveTarget = targetATK;
-        }
-
+        const isManualInput = opponentAttackPower != null;
+        const targetATK = isManualInput ? opponentAttackPower : vanguardPower;
+        const effectiveTarget = targetATK - vanguardPower;
+        // Equal power hits: defense must be strictly greater than attack.
         const guardNeeded = effectiveTarget - currentGuard;
-        let required5kIncrements = 0;
-        if (guardNeeded > 0) {
-            required5kIncrements = Math.ceil(guardNeeded / 5000);
-        }
+        const required5kIncrements = gameState.resources.sentinelActive || guardNeeded < 0 ? 0 : Math.floor(guardNeeded / 5000) + 1;
 
         return {
             required5kIncrements,
             currentAttackTarget: targetATK,
             isDifferenceMode: isManualInput
         };
-    }, [vanguardPower, currentGuard, opponentAttackPower]);
+    }, [vanguardPower, currentGuard, opponentAttackPower, gameState.resources.sentinelActive]);
 
     const modifyUnit = useCallback((slot, changes) => {
-        const unit = gameState.units[slot];
+        const unit = stateRef.current.units[slot];
         let newUnit = { ...unit };
 
         Object.keys(changes).forEach(key => {
@@ -544,20 +578,20 @@ export default function App() {
                 changes.isSupporting === undefined &&
                 !newUnit.isBackRowAttack
             ) {
-                if (!newUnit.isSupporting) newUnit.isSupporting = true;
+                if (!newUnit.isSupporting && newUnit.grade <= 1 && !newUnit.isRested) newUnit.isSupporting = true;
             }
         }
 
         if (newUnit.crit < 0) newUnit.crit = 0;
 
-        const newUnits = { ...gameState.units, [slot]: newUnit };
+        const newUnits = { ...stateRef.current.units, [slot]: newUnit };
         updateState({ units: newUnits });
     }, [gameState.units, updateState]);
-    // 2. 横置/竖置单位按钮  
+    // 2. 横置/竖置单位按钮
     const restUnit = useCallback((slot) => {
         // 如果多重支援模式：将该列或所有支援中的单位一并横置
         if (gameState.isMultiSupportMode) {
-            const newUnits = { ...gameState.units };
+            const newUnits = cloneUnits(stateRef.current.units);
             // 横置目标槽的整列
             const col = slot.split('_')[1];
             Object.keys(newUnits).forEach(k => {
@@ -575,7 +609,7 @@ export default function App() {
     const standUnit = useCallback((slot) => {
         // 如果多重支援模式：把同一纵列的单位都站起来
         if (gameState.isMultiSupportMode) {
-            const newUnits = { ...gameState.units };
+            const newUnits = cloneUnits(stateRef.current.units);
             const col = slot.split('_')[1];
             Object.keys(newUnits).forEach(k => {
                 if (k.endsWith('_' + col)) {
@@ -655,8 +689,8 @@ export default function App() {
         const attacker = gameState.units[attackerSlot];
         if (!attacker || attacker.isRested || getUnitPower(attacker) === 0) return;
 
-        const historyEntry = { units: { ...gameState.units }, attackCount: gameState.attackCount };
-        const newUnits = { ...gameState.units };
+        const historyEntry = { units: cloneUnits(gameState.units), attackCount: gameState.attackCount };
+        const newUnits = cloneUnits(stateRef.current.units);
 
         // Mark attacker as rested and cancel its support
         newUnits[attackerSlot] = { ...newUnits[attackerSlot], isRested: true, isSupporting: false };
@@ -677,13 +711,13 @@ export default function App() {
             }
         }
 
-        updateState({ units: newUnits, attackCount: gameState.attackCount + 1, attackHistory: [...gameState.attackHistory, historyEntry] });
+        updateState({ units: newUnits, attackCount: gameState.attackCount + 1, attackHistory: [...gameState.attackHistory, historyEntry].slice(-100) });
         setSelectedSlot(null);
     };
 
-    // 2. "回合开始" 按钮：自动识别 Vanguard 当前 GRADE，逐级 Ride 到下一等级（仅 G0-G3），+3EN
+    // Stand phase / clear prior temporary state; Ride and energy are separate explicit actions.
     const handleTurnStart = () => {
-        const newUnits = { ...gameState.units };
+        const newUnits = cloneUnits(stateRef.current.units);
 
         // 竖置所有单位
         Object.keys(newUnits).forEach(slot => {
@@ -691,38 +725,42 @@ export default function App() {
             unit.isRested = false;
             const isBackRow = slot.startsWith('back');
             const totalPower = getUnitPower({ ...unit, powerBuff: 0 });
-            if (isBackRow && totalPower > 0) {
+            if (isBackRow && totalPower > 0 && unit.grade <= 1 && !unit.isBackRowAttack) {
                 unit.isSupporting = true;
             }
         });
 
-        // Vanguard Ride：根据当前 basePower 识别 GRADE，升到下一等级（孜限在 G0-G3 范围内）
+        Object.values(newUnits).forEach(unit => { unit.powerBuff = 0; unit.otActive = false; unit.crit = 1; });
+        updateState({ units: newUnits, attackCount: 0, attackHistory: [], resources: { ...gameState.resources, shield: 0, sentinelActive: false } });
+        setSelectedSlot(null);
+    };
+
+    const rideNextGrade = () => {
+        const newUnits = cloneUnits(stateRef.current.units);
+        // Ride to the next configured grade, using the unit’s explicit grade.
         const v = newUnits.front_center;
         if (v) {
-            const currentGradeIdx = detectGradeFromPower(v.basePower);
+            const currentGradeIdx = v.grade;
             const maxGradeIdx = GRADE_PRESETS.length - 1;
             if (currentGradeIdx < maxGradeIdx) {
                 const nextGrade = currentGradeIdx + 1;
                 const nextBasePower = GRADE_PRESETS[nextGrade];
-                newUnits.front_center = { ...v, basePower: nextBasePower };
+                newUnits.front_center = { ...v, grade: nextGrade, basePower: nextBasePower };
             }
         }
 
-        // +3 EN
-        const addedEnergy = Math.min(MAX_ENERGY, (gameState.energy || 0) + 3);
-        updateState({ units: newUnits, attackHistory: [], energy: addedEnergy });
-        setSelectedSlot(null);
+        updateState({ units: newUnits });
     };
 
     // 保留：一键竖置（新名称为 standAllUnits，不做 Ride）
     const standAllUnits = () => {
-        const newUnits = { ...gameState.units };
+        const newUnits = cloneUnits(stateRef.current.units);
         Object.keys(newUnits).forEach(slot => {
             const unit = newUnits[slot];
             unit.isRested = false;
             const isBackRow = slot.startsWith('back');
             const totalPower = getUnitPower({ ...unit, powerBuff: 0 });
-            if (isBackRow && totalPower > 0) {
+            if (isBackRow && totalPower > 0 && unit.grade <= 1 && !unit.isBackRowAttack) {
                 unit.isSupporting = true;
             }
         });
@@ -732,9 +770,10 @@ export default function App() {
 
     // 回合结束重置：只清除修正值和暴击等附加状态，不竖置单位
     const roundStateReset = () => {
-        const newUnits = { ...gameState.units };
+        const newUnits = cloneUnits(stateRef.current.units);
         Object.keys(newUnits).forEach(slot => {
             const unit = newUnits[slot];
+            unit.otActive = false;
             unit.powerBuff = 0; // 清空修正值
             unit.crit = 1; // 重置暴击倍数
             // 不修改 isRested 和 isSupporting，保持当前状态
@@ -777,7 +816,7 @@ export default function App() {
             if (!swapSource) {
                 setSwapSource(slot);
             } else {
-                const newUnits = { ...gameState.units };
+                const newUnits = cloneUnits(stateRef.current.units);
                 const temp = { ...newUnits[swapSource] };
                 newUnits[swapSource] = { ...newUnits[slot] };
                 newUnits[slot] = temp;
@@ -798,12 +837,14 @@ export default function App() {
                 setSwapMode(false);
             }
         } else {
+            setCustomBasePower(''); setManualInput('');
+            setShowTools(false); setShowAttackAdjust(false);
             setSelectedSlot(selectedSlot === slot ? null : slot);
         }
     };
 
     const handleRetire = useCallback((slot) => {
-        modifyUnit(slot, { basePower: 0, powerBuff: 0, crit: 1, isRested: false, isSupporting: false });
+        modifyUnit(slot, { ...INITIAL_UNIT, isVanguard: slot === 'front_center' });
         setSelectedSlot(null);
     }, [modifyUnit]);
 
@@ -820,20 +861,21 @@ export default function App() {
                 resources: {
                     ...gameState.resources,
                     sentinelActive: false,
+                    sentinelsRemaining: gameState.resources.sentinelsRemaining + 1,
                     shield: 0 // 取消时清零 G 值
                 }
             });
             setOpponentAttackPower(null);
         } else if (gameState.resources.sentinelsRemaining > 0) {
             // PG 未激活且有剩余，点击则激活
-            const newShield = 99999999;
+
             const newSentinels = gameState.resources.sentinelsRemaining - 1;
             updateState({
                 resources: {
                     ...gameState.resources,
                     sentinelActive: true,
                     sentinelsRemaining: newSentinels,
-                    shield: newShield
+                    shield: 0
                 }
             });
             setOpponentAttackPower(null);
@@ -851,7 +893,7 @@ export default function App() {
 
     const applyFrontRowBuff = (value) => {
         const slots = ['front_left', 'front_center', 'front_right'];
-        const newUnits = { ...gameState.units };
+        const newUnits = cloneUnits(stateRef.current.units);
         slots.forEach(slot => {
             const unit = newUnits[slot];
             unit.powerBuff += value;
@@ -870,15 +912,15 @@ export default function App() {
         const unit = gameState.units[selectedSlot] || {};
         const current = unit.powerBuff || 0;
         // Toggle OT buff on the selected slot
-        if (current === OT_BUFF_VALUE) {
-            modifyUnit(selectedSlot, { powerBuff: 0 });
+        if (unit.otActive) {
+            modifyUnit(selectedSlot, { powerBuff: current - OT_BUFF_VALUE, otActive: false });
         } else {
-            modifyUnit(selectedSlot, { powerBuff: OT_BUFF_VALUE });
+            modifyUnit(selectedSlot, { powerBuff: current + OT_BUFF_VALUE, otActive: true });
         }
     };
 
     // 是否任意单位处于 OT 状态（用于 OT 按钮发光）
-    const hasAnyOT = Object.values(gameState.units).some(u => (u && u.powerBuff === OT_BUFF_VALUE));
+    const hasAnyOT = Object.values(gameState.units).some(u => (u && u.otActive));
 
     // --- Renderers ---
 
@@ -928,7 +970,7 @@ export default function App() {
         if (totalPower.toString().length > 8) powerTextClass = "text-lg";
 
         // NEW: Apply rainbow class for OT
-        const isOTPower = totalPower === OT_BUFF_VALUE;
+        const isOTPower = !!unit.otActive;
 
         let powerTextColor = isOTPower
             ? "rainbow-text" // Use the rainbow class for OT
@@ -939,9 +981,10 @@ export default function App() {
 
         return (
             <div
+                data-testid={`unit-${id}`}
                 onClick={() => handleSlotClick(id)}
                 className={`
-                    relative flex flex-col items-center justify-center p-1 pt-4 rounded-lg border-2 
+                    relative flex flex-col items-center justify-center p-1 pt-4 rounded-lg border-2
                     transition-all duration-200 h-[140px] sm:h-[150px] select-none backdrop-blur-sm overflow-hidden
                     ${isOTPower ? 'rainbow-glow' : ''} ${borderClass} ${bgClass}
                 `}
@@ -976,42 +1019,11 @@ export default function App() {
                 <span className={`absolute top-1 left-2 text-[9px] uppercase font-bold tracking-widest opacity-70 ${isVanguardSlot ? 'text-red-400' : 'text-slate-500'}`}>
                     {label}
                 </span>
-                {editingGradeSlot === id ? (
-                    <input
-                        type="number"
-                        value={editingGradeValue}
-                        onChange={(e) => setEditingGradeValue(e.target.value)}
-                        onBlur={() => {
-                            const gradeNum = parseInt(editingGradeValue);
-                            if (!isNaN(gradeNum) && gradeNum >= 0) {
-                                setUnitGrades({ ...unitGrades, [id]: gradeNum });
-                            }
-                            setEditingGradeSlot(null);
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                const gradeNum = parseInt(editingGradeValue);
-                                if (!isNaN(gradeNum) && gradeNum >= 0) {
-                                    setUnitGrades({ ...unitGrades, [id]: gradeNum });
-                                }
-                                setEditingGradeSlot(null);
-                            }
-                        }}
-                        autoFocus
-                        className="absolute top-1 right-2 w-12 h-6 bg-yellow-900/70 text-white text-xs px-1 rounded border border-yellow-600 font-mono"
-                    />
-                ) : (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingGradeSlot(id);
-                            setEditingGradeValue(String(unitGrades[id] ?? detectGradeFromPower(unit.basePower)));
-                        }}
-                        className="absolute top-1 right-2 text-[9px] bg-slate-900/60 px-2 py-0.5 rounded text-xs font-mono border border-slate-800 hover:border-yellow-400 hover:bg-slate-800/80 cursor-pointer transition-colors whitespace-nowrap"
-                    >
-                        {getGradeLabel(unit)}
-                    </button>
-                )}
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleSlotClick(id); }}
+                    aria-label={`${label} ${t.edit_grade}`}
+                    className="absolute top-1 right-2 text-[9px] bg-slate-900/60 px-2 py-1 rounded text-xs font-mono border border-slate-800 hover:border-yellow-400"
+                >{getGradeLabel(unit)}</button>
 
                 <div className="z-10 flex flex-col items-center mt-3 w-full px-1">
                     <span className={`${powerTextClass} font-black tracking-tighter font-mono ${powerTextColor} break-all text-center leading-none whitespace-nowrap`}>
@@ -1057,7 +1069,9 @@ export default function App() {
     const TotalPowerDisplay = ({ frontId, backId }) => {
         const frontUnit = gameState.units[frontId] || INITIAL_UNIT;
         const backUnit = gameState.units[backId] || INITIAL_UNIT;
-        const frontPower = getUnitPower(frontUnit);
+        const useBack = backUnit.isBackRowAttack && !backUnit.isRested && getUnitPower(backUnit) > 0;
+        const attackerUnit = useBack ? backUnit : frontUnit;
+        const frontPower = getUnitPower(attackerUnit);
 
         let supportPower = 0;
         if (gameState.isMultiSupportMode) {
@@ -1069,13 +1083,13 @@ export default function App() {
             });
             // The front unit of this column is the attacker, it shouldn't be counted as support power for its own column.
             // Subtract its power if it was somehow marked as supporting in this total calculation
-            if (frontUnit.isSupporting && !frontUnit.isRested) {
+            if (attackerUnit.isSupporting && !attackerUnit.isRested) {
                 supportPower = Math.max(0, supportPower - frontPower);
             }
 
         } else {
             // Standard Mode: Only back unit
-            if (backUnit.isSupporting && !backUnit.isRested) {
+            if (!useBack && backUnit.isSupporting && !backUnit.isRested) {
                 supportPower = getUnitPower(backUnit);
             }
         }
@@ -1152,7 +1166,7 @@ export default function App() {
                             <span className="text-slate-300 font-bold">{t.attack}: {gameState.attackCount}</span>
                         </button>
                         {showAttackAdjust && (
-                            <div className="absolute right-0 mt-1 w-24 bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-2 z-50">
+                            <div className="attack-adjust absolute right-0 mt-1 w-40 bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-2 z-50">
                                 <div className="flex justify-between items-center text-sm font-mono text-white">
                                     <button onClick={() => updateState({ attackCount: gameState.attackCount - 1 })} className="p-1 bg-slate-800 rounded hover:bg-slate-700"><Minus size={14} /></button>
                                     <span className="text-yellow-400 font-bold">{gameState.attackCount}</span>
@@ -1162,11 +1176,13 @@ export default function App() {
                             </div>
                         )}
                     </div>
-                    <div className="relative"><button onClick={() => setShowTools(!showTools)} className={`p-2 rounded transition-colors ${showTools ? 'text-cyan-400 bg-cyan-950' : 'text-slate-400'}`}><Settings2 size={18} /></button></div>
+                    <div className="relative"><button aria-label={t.unit_adj + " / " + t.language} onClick={() => { setSelectedSlot(null); setShowTools(!showTools); setShowAttackAdjust(false); }} className={`p-2 rounded transition-colors ${showTools ? 'text-cyan-400 bg-cyan-950' : 'text-slate-400'}`}><Settings2 size={18} /></button></div>
                 </div>
             </header>
+            {storageWarning && <p role="status" className="p-3 text-amber-300">本地保存失败，当前操作仍可继续；请保持页面打开。</p>}
             {showTools && (
-                <div className="mx-4 mt-2 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-2xl mb-4">
+                <div role="dialog" aria-label={t.language} className="tools-panel mx-4 mt-2 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-2xl mb-4">
+                    <div className="tools-heading flex justify-end"><button aria-label="Close settings" onClick={() => setShowTools(false)} className="p-2"><X size={20} /></button></div>
                     <div className="border-b border-slate-800 pb-2 mb-3">
                         <div className="flex justify-between text-[10px] text-cyan-500 mb-2 uppercase tracking-wider items-center"><Globe size={12} className="mr-1" />{t.language}</div>
                         <div className="grid grid-cols-3 gap-2">{LANGUAGES.map(lang => (<button key={lang.code} onClick={() => handleLanguageChange(lang.code)} className={`py-1.5 rounded text-xs font-bold transition-colors border ${language === lang.code ? 'bg-cyan-700/50 text-white border-cyan-500' : 'bg-slate-800/50 text-slate-300 border-slate-700 hover:bg-slate-700/50'}`}>{lang.name}</button>))}</div>
@@ -1190,12 +1206,13 @@ export default function App() {
                                                 const newPresets = [...GRADE_PRESETS];
                                                 newPresets[idx] = val;
                                                 // Update global state
-                                                const newUnits = { ...gameState.units };
+                                                const newUnits = cloneUnits(stateRef.current.units);
                                                 if (newUnits.front_center && newUnits.front_center.basePower === GRADE_PRESETS[idx]) {
                                                     newUnits.front_center = { ...newUnits.front_center, basePower: val };
                                                 }
                                                 updateState({ units: newUnits });
                                                 GRADE_PRESETS.splice(0, GRADE_PRESETS.length, ...newPresets);
+                                                updateState({ gradePresets: newPresets });
                                             }
                                         }}
                                         className="w-full bg-slate-800 text-slate-200 text-[10px] px-1 py-0.5 rounded outline-none border border-slate-700 focus:border-cyan-400 text-center font-mono"
@@ -1234,6 +1251,7 @@ export default function App() {
                             {/* 回合状态重置 (Round Reset) */}
                             <button onClick={roundStateReset} className="py-1.5 bg-red-800/50 text-red-300 border border-red-700 rounded-lg font-bold text-xs hover:bg-red-700/70 transition-colors flex items-center justify-center gap-1"><RefreshCcw size={12} /> {t.round_reset}</button>
                             {/* 回合开始 (Turn Start - Ride + 3 EN) */}
+                            <button onClick={rideNextGrade} className="py-1.5 bg-blue-900/50 text-blue-300 border border-blue-700 rounded-lg font-bold text-xs">{t.ride_next}</button>
                             <button onClick={handleTurnStart} className="py-1.5 bg-green-800/50 text-green-300 border border-green-700 rounded-lg font-bold text-xs hover:bg-green-700/70 transition-colors flex items-center justify-center gap-1"><ChevronsUp size={12} /> {t.turn_start}</button>
                             <button onClick={handleAttackUndo} disabled={gameState.attackHistory.length === 0} className={`py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-1 border ${gameState.attackHistory.length === 0 ? 'bg-slate-900 text-slate-700 border-slate-800 cursor-not-allowed opacity-50' : 'bg-yellow-800/50 text-yellow-300 border-yellow-700 hover:bg-yellow-700/70'}`}><CornerUpLeft size={12} /> {t.undo_attack}</button>
                         </div>
@@ -1361,16 +1379,22 @@ export default function App() {
                 </section>
             </main>
             {selectedSlot && !swapMode && (
-                <div className="fixed bottom-0 inset-x-0 bg-[#0b1120] border-t border-slate-700 rounded-t-2xl shadow-[0_-5px_50px_rgba(0,0,0,0.9)] z-50 animate-in slide-in-from-bottom duration-200">
-                    <div className="p-4 max-w-md mx-auto space-y-4">
-                        <div className="flex justify-between items-center border-b border-slate-800 pb-2"><div className="flex flex-col"><span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{t.unit_adj}</span><span className="text-lg text-white font-bold capitalize">{selectedSlot.replace('front', t.front_l.split(' ')[0]).replace('back', t.back_l.split(' ')[0]).replace('_', ' ')}</span></div><button onClick={() => setSelectedSlot(null)} className="bg-slate-800 p-1.5 rounded-full text-slate-400 hover:bg-slate-700"><X size={18} /></button></div>
+                <div className="drawer-backdrop" onClick={() => setSelectedSlot(null)}>
+                <div role="dialog" aria-modal="true" aria-label={t.unit_adj} onClick={e => e.stopPropagation()} className="unit-drawer fixed bottom-0 inset-x-0 bg-[#0b1120] border-t border-slate-700 rounded-t-2xl shadow-[0_-5px_50px_rgba(0,0,0,0.9)] z-50 animate-in slide-in-from-bottom duration-200">
+                    <div className="drawer-content p-4 max-w-md mx-auto space-y-4">
+                        <div className="drawer-heading flex justify-between items-center border-b border-slate-800 pb-2"><div className="flex flex-col"><span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{t.unit_adj}</span><span className="text-lg text-white font-bold capitalize">{selectedSlot.replace('front', t.front_l.split(' ')[0]).replace('back', t.back_l.split(' ')[0]).replace('_', ' ')}</span></div><button aria-label="Close unit" onClick={() => setSelectedSlot(null)} className="bg-slate-800 p-1.5 rounded-full text-slate-400 hover:bg-slate-700"><X size={18} /></button></div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <label className="text-xs text-slate-400" htmlFor="unit-grade">{t.edit_grade}</label>
+                            <input id="unit-grade" type="number" min="0" value={gameState.units[selectedSlot].grade} onChange={e => modifyUnit(selectedSlot, { grade: Math.max(0, finite(e.target.value)) })} className="w-16 bg-slate-800 border border-slate-700 rounded px-2" />
+                            {[0, 1, 2, 3].map(grade => <button key={grade} onClick={() => modifyUnit(selectedSlot, { grade })} className="px-3 rounded bg-slate-800 text-xs">G{grade}</button>)}
+                        </div>
                         <div><div className="flex justify-between items-center mb-1.5"><div className="text-[10px] text-slate-500 uppercase font-bold">{t.base_power_setup}</div><button onClick={() => modifyUnit(selectedSlot, { basePower: 0 })} className="px-2 py-0.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-800/50"><RotateCcw size={10} className="inline mr-1" />{t.reset_base}</button></div><div className="flex flex-wrap gap-1.5">{BASE_PRESETS.map(preset => (<button key={preset.val} onClick={() => modifyUnit(selectedSlot, { basePower: preset.val })} className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 text-slate-300 text-xs font-mono rounded hover:bg-blue-900/30 hover:border-blue-500/50 hover:text-white transition-colors">{preset.label}</button>))}</div></div>
                         <div className="flex items-center gap-2"><input type="number" value={customBasePower} onChange={(e) => setCustomBasePower(e.target.value)} className="w-full min-w-0 bg-black/50 text-white text-sm px-2 py-1 rounded outline-none font-mono border border-slate-700 focus:border-blue-500" placeholder={t.custom_value} /><button onClick={() => { const val = parseInt(customBasePower); if (!isNaN(val) && val >= 0) { modifyUnit(selectedSlot, { basePower: val }); } setCustomBasePower(""); }} className="flex-shrink-0 bg-yellow-900/30 text-yellow-400 text-xs font-bold rounded py-1 px-3 border border-yellow-900/50">{t.set_base}</button></div>
 
                         <div>
                             <div className="flex justify-between items-center mb-1.5">
                                 <div className="text-[10px] text-slate-500 uppercase font-bold">{t.power_buff_adj}</div>
-                                <button onClick={() => modifyUnit(selectedSlot, { powerBuff: 0 })} className="px-2 py-0.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-800/50"><RotateCcw size={10} className="inline mr-1" />{t.reset_buff}</button>
+                                <button onClick={() => modifyUnit(selectedSlot, { powerBuff: 0, otActive: false })} className="px-2 py-0.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-800/50"><RotateCcw size={10} className="inline mr-1" />{t.reset_buff}</button>
                             </div>
 
                             {/* 增益/减益按钮网格 (3列 x 2行) */}
@@ -1426,13 +1450,13 @@ export default function App() {
                                     {t.intercept}
                                 </button>
                                 <button
-                                    onClick={() => modifyUnit(selectedSlot, { hasDoubleStrike: !gameState.units[selectedSlot].hasDoubleStrike })}
+                                    onClick={() => modifyUnit(selectedSlot, { hasDoubleStrike: !gameState.units[selectedSlot].hasDoubleStrike, hasTripleStrike: false })}
                                     className={`py-2 rounded font-bold text-xs border transition-all ${gameState.units[selectedSlot].hasDoubleStrike ? 'bg-purple-700/50 text-white border-purple-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
                                 >
                                     {t.double_strike}
                                 </button>
                                 <button
-                                    onClick={() => modifyUnit(selectedSlot, { hasTripleStrike: !gameState.units[selectedSlot].hasTripleStrike })}
+                                    onClick={() => modifyUnit(selectedSlot, { hasTripleStrike: !gameState.units[selectedSlot].hasTripleStrike, hasDoubleStrike: false })}
                                     className={`py-2 rounded font-bold text-xs border transition-all ${gameState.units[selectedSlot].hasTripleStrike ? 'bg-red-700/50 text-white border-red-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
                                 >
                                     {t.triple_strike}
@@ -1440,6 +1464,7 @@ export default function App() {
                             </div>
                         </div>
                     </div>
+                </div>
                 </div>
             )}
             <style>{`
@@ -1475,4 +1500,13 @@ export default function App() {
 import ReactDOM from 'react-dom/client'
 
 // Render the App defined in this file
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+class RecoveryBoundary extends React.Component {
+    state = { failed: false };
+    static getDerivedStateFromError() { return { failed: true }; }
+    componentDidCatch(error) { console.error('VG render failed', error); }
+    render() {
+        if (this.state.failed) return <main className="p-6 text-white"><h1>页面遇到了错误</h1><p>已保存的对局记录会保留。请重新载入以恢复。</p><button className="mt-4 p-3 bg-blue-700 rounded" onClick={() => location.reload()}>重新载入</button></main>;
+        return this.props.children;
+    }
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<RecoveryBoundary><App /></RecoveryBoundary>);
