@@ -1,17 +1,34 @@
 # VG Counter
 
-A mobile-friendly Cardfight!! Vanguard tabletop counter, with Chinese, Japanese and English interfaces. It tracks six unit slots, power modifiers, critical, rest/stand state, energy, shield, soul, damage and remaining triggers. Data stays in your browser; this is a manual counter, not a rules engine.
+Mobile-first Cardfight!! Vanguard tabletop counter in Chinese, Japanese and English. Tracks six unit slots, power, critical, rest/stand, soul, damage, energy, shield and remaining triggers. This is a manual player aid; card eligibility and additional card effects remain the players' responsibility.
 
-## Use
+## Mobile layout
 
-- Tap a unit to edit power, modifiers and critical. Its sheet scrolls independently and closes using its top button, backdrop or Escape.
-- Tap the grade badge to set the actual card grade. Grade and power are independent.
-- **Turn Start** stands units and clears temporary power/critical, attack history and shield. It does not Ride or charge energy.
-- **Ride next** explicitly advances the Vanguard to the next configured grade/power preset. Use the energy controls at the actual Energy Generator timing; skip the first charge when required by its card text.
-- **OT** toggles an additional 100,000,000 on the selected unit and preserves other modifiers. Apply card-specific additional effects manually.
-- Enter the opponent attack power to calculate guarding. Equal power hits; shield must make defense strictly higher. PG records a no-hit effect independently of shield; cancel restores the counter, while resetting defense ends the recorded battle.
-- Back-row attack and multi-support are manual overrides for card effects. They do not validate whether your card has that ability.
-- Remaining trigger counters are editable; the initial 4 critical / 4 draw / 3 front / 4 heal / 1 OT is only a sample distribution.
+- Six visible unit circles, direct +5k / +10k buttons and column attack totals.
+- Start turn, Persona Ride and Undo stay at the top. Ride next is directly available for the selected Vanguard.
+- Critical (yellow), Draw (red), Front (blue), Heal (green) and Over (rainbow) have direct buttons below the field. Target and remaining count are explicit.
+- Select a unit to subtract power, adjust critical or stand/rest. Grade, base power, abilities, swapping and retiring expand inline. No modal or drawer hides the field.
+- Damage, soul and energy have direct steppers. Guard mode provides 5k/10k/15k/20k/25k/50k shield buttons and PG.
+- Rare settings (preset editing, trigger counts, multi-boost, extra counters, dice and new-game reset) expand at the bottom. Existing custom counters remain directly usable.
+
+## Rules and actions
+
+- **Start turn** stands units and clears temporary power/critical, Persona bonus, attack count and guard values. It does not Ride or charge energy.
+- **Persona Ride** records the resolved continuous front-row +10,000 effect. Later front-row units receive it, and units leaving the front row lose it. Toggle cancels the recorded effect; draw the physical card yourself. It does not validate the ride's eligibility.
+- **Front trigger** gives power only to units currently in the front row. Later calls do not receive that trigger's power.
+- **Critical** normally gives power and critical to the selected unit. Split allocation lets you select separate targets in view of the field and commits both as one undoable action.
+- **Heal** automatically removes one damage if your damage is at least the entered opponent damage. With unknown opponent damage, choose whether the condition is met before the trigger resolves. Power applies even without healing.
+- **OT** adds 100,000,000 without replacing existing power modifiers. Remove the physical trigger, draw a card and apply card-specific additional effects manually. Regular Draw also requires drawing the physical card yourself.
+- **Guard** requires defense strictly above attack; equality hits. PG records a resolved no-hit effect independently of shield. Cancel restores its count; next guard ends the recorded battle.
+- **Ride next** explicitly advances the configured grade/power and adds the old Vanguard to soul. EN is charged manually at the actual Energy Generator timing and capped at 10.
+- Back-row attack and multi-boost are manual overrides for actual card abilities.
+- Initial trigger counts 4 critical / 4 draw / 3 front / 4 heal / 1 OT are a sample distribution, editable for your deck and format. Trigger power can be 10k or 5k.
+
+## Storage and assets
+
+The existing `VG_COMBAT_STATE_V20_LOCAL` save key is retained. Version 3 validates old saves and stores up to 40 immutable undo snapshots. Invalid JSON falls back to a usable initial game; storage failures leave the in-memory game interactive. No user game data is sent to a server.
+
+`public/circles.svg` is an original geometric magic-circle illustration, not official artwork. The interface is an unofficial fan tool and links to the official rules.
 
 ## Development
 
@@ -21,10 +38,11 @@ npm run dev
 npm test
 ```
 
-Production CSS is generated locally using Tailwind, without the runtime Tailwind CDN. The committed `dist/` contains the production build. Regression tests exercise the built application in jsdom, including damaged old saves and guard equality.
+Production CSS is bundled locally without a runtime CDN. The committed `dist/` contains the production build. Tests exercise the built application in jsdom and the pure game model: direct actions, split allocation, Persona / Front timing, healing, OT, guard boundaries, boost/back-row attack, atomic undo, reload, malformed saves and storage failures.
 
 ## Rule references
 
-- [Official comprehensive rules](https://cf-vanguard.com/howto/rule/) — hit determination §10.7.1.2; equality hits.
-- [Official Over Trigger text](https://cf-vanguard.com/cardlist/?cardno=D-PR%2F001) — +100,000,000 for the turn, with card-specific additional effects handled manually.
-- [Official energy timing Q&A Q10116](https://cf-vanguard.com/cardlist/?cardno=DZ-SS16%2F025) — Energy Generator resolves at the start of the Ride phase, before riding.
+- [Official comprehensive rules](https://cf-vanguard.com/howto/rule/) — Persona Ride §7.15, trigger effects and hit determination (equal power hits).
+- [Persona Ride explanation](https://cf-vanguard.com/howto/new_system_vgd/) — front-row continuous effect, including units called later.
+- [Official rules FAQ](https://cf-vanguard.com/howto/question/?id=term) — Front trigger applies only to the units present at resolution.
+- [Official Over Trigger text](https://cf-vanguard.com/cardlist/?cardno=D-PR%2F001) — +100,000,000 and card-specific additional effects.
