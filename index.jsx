@@ -508,14 +508,23 @@ function GradePicker({ slot, unit, anchor, t, onSelect, onClose }) {
     const [custom, setCustom] = useState(String(unit.grade));
     const dialogRef = useRef(null);
     useEffect(() => {
-        dialogRef.current?.querySelector('button[data-grade="' + unit.grade + '"]')?.focus();
+        const previousFocus = document.activeElement;
+        (dialogRef.current?.querySelector('button[data-grade="' + unit.grade + '"]') || dialogRef.current?.querySelector('input'))?.focus();
         const outside = event => {
             if (!dialogRef.current?.contains(event.target) && !event.target.closest?.('[data-grade-toggle]')) onClose();
         };
         document.addEventListener('pointerdown', outside);
-        const escape = event => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } };
+        const escape = event => {
+            if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); onClose(); }
+            if (event.key === 'Tab') {
+                const controls = [...(dialogRef.current?.querySelectorAll('button,input') || [])];
+                const first = controls[0], last = controls[controls.length - 1];
+                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+            }
+        };
         document.addEventListener('keydown', escape, true);
-        return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
+        return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); previousFocus?.focus(); };
     }, []);
     const apply = value => { if (value !== '' && Number.isFinite(Number(value))) { onSelect(slot, value); onClose(); } };
     const width = Math.min(228, window.innerWidth - 16);
@@ -534,7 +543,7 @@ const PLAYMAT_COPY = {
     en: { stride: 'Stride', turn_end: 'Turn end', free_support: 'Free boost', back_intercept: 'Rear intercept', custom_grade: 'Custom grade', buff_short: 'Mod', pg_button: 'Perfect guard', pg_off: 'Cancel PG', shield_value: 'Shield', intercepting: 'In guard circle', settle_guard: 'Resolve', cancel_guard: 'Cancel', guard_circle: 'Guard circle', guarded_power: 'Total defense', guard_need: 'Shield needed', guard_success: 'Guard successful', guard_failed: 'More shield needed', stand: 'Stand', unit_status: 'Abilities', invalid_intercept: 'This unit cannot intercept now', fixed_vanguard: 'The Vanguard cannot swap positions', moving: 'Moving', move_done: 'Swapped', opponent_atk: 'Opponent power', manual_shield: 'Shield from hand', rear_attack: 'Rear attack' },
     ja: { stride: '超越', turn_end: 'ターン終了', free_support: '自由ブースト', back_intercept: '後列インターセプト', custom_grade: '任意のグレード', buff_short: '修', pg_button: '完全ガード', pg_off: '完全ガード解除', shield_value: 'シールド', intercepting: 'ガードに参加', settle_guard: 'バトル終了', cancel_guard: '取消', guard_circle: 'ガーディアンサークル', guarded_power: '防御合計', guard_need: '追加シールド', guard_success: 'ガード成功', guard_failed: 'シールド不足', stand: 'スタンド', unit_status: '能力', invalid_intercept: 'このユニットはインターセプトできません', fixed_vanguard: 'ヴァンガードは移動できません', moving: '移動中', move_done: '移動しました', opponent_atk: '相手のパワー', manual_shield: '手札のシールド', rear_attack: '後列アタック' },
 };
-const ATTACK_PRESETS = [13000, 18000, 23000, 28000, 33000, 38000, 43000, 53000, 63000];
+const ATTACK_PRESETS = [13000, 18000, 21000, 23000, 28000, 31000, 33000, 36000, 41000];
 const DIE_PIPS = [[4], [0, 8], [0, 4, 8], [0, 2, 6, 8], [0, 2, 4, 6, 8], [0, 2, 3, 5, 6, 8]];
 const DIE_ROTATIONS = ['rotateX(0deg)', 'rotateX(-90deg)', 'rotateY(-90deg)', 'rotateY(90deg)', 'rotateX(90deg)', 'rotateY(180deg)'];
 const diePose = value => `rotateX(-18deg) rotateY(22deg) ${DIE_ROTATIONS[value - 1]}`;
@@ -1351,7 +1360,7 @@ export default function App() {
                             <div className="drawer-heading border-b border-slate-800">
                                 <div className="drawer-toolbar">
                                     <span className="drawer-unit-name text-white">{({ front_left: t.front_l, front_center: t.vanguard, front_right: t.front_r, back_left: t.back_l, back_center: t.back_c, back_right: t.back_r })[selectedSlot]}</span>
-                                    <button type="button" data-grade-toggle className="drawer-grade" aria-label={t.edit_grade} onClick={e => openGrade(e, selectedSlot)}><span>G</span><b>{gameState.units[selectedSlot].grade}</b><ChevronDown size={12} /></button>
+                                    <button type="button" data-grade-toggle data-testid="drawer-grade" className="drawer-grade" aria-label={t.edit_grade} onClick={e => openGrade(e, selectedSlot)}><span>G</span><b>{gameState.units[selectedSlot].grade}</b><ChevronDown size={12} /></button>
                                     <button type="button" data-testid="unit-close" aria-label={t.close} onClick={() => setSelectedSlot(null)} className="drawer-close bg-slate-800 rounded-full text-slate-400 hover:bg-slate-700"><X size={18} /></button>
                                 </div>
                                 <div className="drawer-summary">

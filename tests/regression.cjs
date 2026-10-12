@@ -54,12 +54,13 @@ async function boot(save) {
 
     // Main grade click opens quick choices and custom input, never a unit drawer.
     x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 10000 }, front_left: { grade: 2, basePower: 11000 } } });
-    await x.click('grade-front_center');
+    x.test('grade-front_center').focus(); await x.click('grade-front_center');
     assert.ok(x.test('grade-picker')); assert.ok(!x.d.querySelector('.unit-drawer'));
     assert.equal(x.test('grade-front_center').textContent, '3');
     assert.equal(x.d.querySelector('.grade-options button[data-grade="4"]').textContent, '428,000');
     x.d.querySelector('[data-grade="4"]').click(); await wait();
     assert.equal(x.state().units.front_center.grade, 4); assert.equal(x.state().units.front_center.basePower, 28000); assert.equal(x.state().units.front_center.powerBuff, 10000);
+    assert.equal(x.d.activeElement, x.test('grade-front_center'));
     await x.click('grade-front_left'); await x.input(x.d.querySelector('.grade-custom input'), 7);
     x.d.querySelector('.grade-custom').dispatchEvent(new x.dom.window.Event('submit', { bubbles: true, cancelable: true })); await wait();
     assert.equal(x.state().units.front_left.grade, 7); assert.equal(x.state().units.front_left.basePower, 11000, 'rear printed power is independent of grade');
@@ -76,6 +77,8 @@ async function boot(save) {
     assert.equal(x.test('base-section').compareDocumentPosition(x.test('buff-section')) & 4, 4);
     assert.equal(x.dom.window.getComputedStyle(x.d.querySelector('.drawer-heading')).position, 'sticky');
     assert.equal(Number(x.test('drawer-power').dataset.value), 18000);
+    x.test('drawer-grade').focus(); await x.click('drawer-grade'); await x.escape();
+    assert.ok(x.d.querySelector('.unit-drawer')); assert.ok(!x.test('grade-picker')); assert.equal(x.d.activeElement, x.test('drawer-grade'));
     await x.text('+5k', x.d.querySelector('.unit-drawer'));
     assert.equal(Number(x.test('drawer-power').dataset.value), 23000);
     const reel = x.d.querySelector('.drawer-live-power .digit-track');
@@ -151,6 +154,20 @@ async function boot(save) {
     node.dispatchEvent(new x.dom.window.MouseEvent('pointerdown', { bubbles:true,button:0,clientX:0,clientY:0 }));
     x.d.dispatchEvent(new x.dom.window.MouseEvent('pointermove', { bubbles:true,clientX:30,clientY:40 })); await wait(390);
     assert.ok(!x.d.querySelector('.drag-unit-preview'), 'scroll movement cancels pending long press');
+    x.done();
+
+    // Mobile legacy-touch path handles held dragging while ordinary swipes keep scrolling.
+    x = await boot({ units:{front_left:{grade:2,basePower:10000},back_left:{grade:1,basePower:8000}} });
+    const touchEvent=(name,point)=>{const event=new x.dom.window.Event(name,{bubbles:true,cancelable:true});Object.defineProperty(event,'touches',{value:name==='touchend'?[]:[point]});Object.defineProperty(event,'changedTouches',{value:[point]});return event;};
+    x.d.elementFromPoint=()=>x.test('unit-back_left');
+    x.test('unit-front_left').dispatchEvent(touchEvent('touchstart',{clientX:10,clientY:10})); await wait(390);
+    assert.ok(x.d.querySelector('.drag-unit-preview'));
+    const heldMove=touchEvent('touchmove',{clientX:40,clientY:140});x.d.dispatchEvent(heldMove); await wait();assert.equal(heldMove.defaultPrevented,true,'held drag prevents native scroll');
+    x.d.dispatchEvent(touchEvent('touchend',{clientX:40,clientY:140}));await wait(390);
+    assert.equal(x.state().units.back_left.basePower,10000);assert.equal(x.state().units.front_left.basePower,8000);assert.ok(!x.d.querySelector('.unit-drawer'));
+    x.test('unit-front_left').dispatchEvent(touchEvent('touchstart',{clientX:10,clientY:10}));
+    const swipe=touchEvent('touchmove',{clientX:10,clientY:45});x.d.dispatchEvent(swipe);await wait(390);
+    assert.equal(swipe.defaultPrevented,false,'a normal swipe is not stolen');assert.ok(!x.d.querySelector('.drag-unit-preview'));
     x.done();
 
     // Guardian circle counts printed SHIELD, reserves interceptors, and retires only on resolution.
