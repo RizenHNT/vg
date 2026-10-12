@@ -72,3 +72,8 @@
 .drawer-critical .official-symbol{width:20px;height:20px;margin-right:1px}
 @media(min-width:640px){.battle-main{padding-left:12px;padding-right:12px}.edge-handle{width:28px}.unit-drawer button,.tools-panel button{min-height:40px}}
 @media(prefers-reduced-motion:reduce){.digit-track,.die-cube.is-rolling,.coin-disc.is-rolling,.side-panel{animation:none!important}.rainbow-text,.rainbow-glow,.ot-button-style.ot-active{animation:none!important}}
+
+.symbol-critical{position:relative;width:20px;height:16px;overflow:hidden;vertical-align:middle}
+.symbol-critical .critical-source{position:absolute;width:30px;max-width:none;height:auto;left:-5px;top:-1px}
+.drawer-critical .symbol-critical{width:20px;height:16px}
+.official-symbol:not(.symbol-critical){clip-path:polygon(24% 3%,76% 3%,99% 50%,76% 97%,24% 97%,1% 50%)}

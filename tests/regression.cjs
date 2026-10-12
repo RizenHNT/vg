@@ -51,7 +51,7 @@ async function boot(save, expandTop = false) {
   // Grade remains independent of power and survives a reload; back-row preview uses the attacker.
   x = await boot({ units: { front_center: { basePower: 13000, grade: 2 }, front_left: { basePower: 10000 }, back_left: { basePower: 8000, isBackRowAttack: true } } });
   assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').textContent.includes('G2'));
-  await x.click('后排攻击'); assert.equal(x.state().units.back_left.isRested, true); assert.equal(x.state().units.front_left.isRested, false);
+  x.doc.querySelector('[data-testid="attack-back_left"]').click(); await wait(); assert.equal(x.state().units.back_left.isRested, true); assert.equal(x.state().units.front_left.isRested, false);
   await x.click('撤回'); assert.equal(x.state().units.back_left.isRested, false);
   await x.click('回合开始'); const saved = x.state(); x.dom.window.close();
   x = await boot(saved); assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').textContent.includes('G2')); x.dom.window.close();

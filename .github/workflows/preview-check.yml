@@ -33,4 +33,5 @@ jobs:
             git commit -m "Save validated mobile preview and official symbols"
             git push origin HEAD:refs/heads/design/official-playmat-preview
             git rev-parse HEAD
+            git rev-parse HEAD^{tree}
           fi
