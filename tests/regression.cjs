@@ -35,7 +35,7 @@ async function boot(save, expandTop = false) {
   await x.click('Ride 升级'); assert.equal(x.state().units.front_center.grade, 1);
   await x.click('回合开始'); assert.equal(x.state().units.front_center.grade, 1); assert.equal(x.state().energy, 0);
   x.doc.querySelector('[data-testid="unit-front_center"]').click(); await wait();
-  let drawer = x.doc.querySelector('[role="dialog"]'); assert.ok(drawer); assert.equal(x.doc.body.style.overflow, 'hidden');
+  let drawer = x.doc.querySelector('[role="dialog"]'); assert.ok(drawer, x.errors.join("\n") || x.doc.body.textContent); assert.equal(x.doc.body.style.overflow, 'hidden');
   await x.click('+10k', drawer); await x.click('OT (100,000,000)', drawer);
   assert.equal(x.state().units.front_center.powerBuff, 100010000);
   await x.click('OT (100,000,000)', drawer); assert.equal(x.state().units.front_center.powerBuff, 10000);
