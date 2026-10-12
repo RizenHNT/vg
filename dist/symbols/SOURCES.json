@@ -1,0 +1,11 @@
+{
+  "source": "https://cf-vanguard.com/howto/first_guide/menu05/",
+  "assets": {
+    "critical": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_ct.jpg",
+    "boost": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_bt.jpg",
+    "intercept": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_is.jpg",
+    "double-drive": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_2d.jpg",
+    "triple-drive": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_3d.jpg"
+  },
+  "attribution": "Cardfight!! Vanguard graphics from the official first guide. Original artwork remains attributed to Bushiroad."
+}
