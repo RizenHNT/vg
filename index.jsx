@@ -35,6 +35,7 @@ const OT_BUFF_VALUE = 100000000;
 
 // Editable shortcuts for this calculator, not universal printed card powers.
 const DEFAULT_GRADE_PRESETS = [6000, 8000, 10000, 13000, 28000];
+const REAR_GRADE_ZERO_POWER = 5000;
 const LEGACY_GRADE_PRESETS = [5000, 8000, 10000, 13000];
 let GRADE_PRESETS = [...DEFAULT_GRADE_PRESETS];
 
@@ -126,13 +127,20 @@ const INITIAL_GAME_STATE = {
     attackCount: 0,
     attackHistory: [],
     isMultiSupportMode: false,
+    supportSlots: [],
     allowBackIntercept: false,
     guardSlots: [],
     opponentPower: null,
+    pendingTrigger: null,
 };
 
 // Sanitize legacy saves before rendering. Every slot must have numeric fields.
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) && value !== null ? Number(value) : fallback;
+const getSafePower = unit => finite(unit?.basePower) + finite(unit?.powerBuff);
+const canSelectFreeSupport = (slot, units, guardSlots = []) => {
+    const unit = units[slot];
+    return slot !== 'front_center' && !!unit && (slot.startsWith('front_') || unit.hasBoost) && !unit.isRested && getSafePower(unit) > 0 && !guardSlots.includes(slot);
+};
 const normalizeState = (raw = {}) => {
     if (!raw || typeof raw !== 'object') raw = {};
     // Keep displayed values when returning from the discarded redesign.
@@ -175,9 +183,13 @@ const normalizeState = (raw = {}) => {
         opponentPower: raw.opponentPower == null ? null : Math.max(0, finite(raw.opponentPower)),
         allowBackIntercept: raw.allowBackIntercept === true,
         isMultiSupportMode: raw.isMultiSupportMode === true,
+        supportSlots: raw.isMultiSupportMode === true ? [...new Set((Array.isArray(raw.supportSlots) ? raw.supportSlots : Object.keys(units).filter(slot => units[slot].isSupporting)).filter(slot => canSelectFreeSupport(slot, units, Array.isArray(raw.guardSlots) ? raw.guardSlots : [])))] : [],
         guardSlots: [...new Set(Array.isArray(raw.guardSlots) ? raw.guardSlots.filter(slot => slot !== 'front_center' && Object.hasOwn(units, slot) && units[slot].basePower + units[slot].powerBuff > 0) : [])],
         extraCounters, resourceCountersMigrated: true,
-        attackHistory: Array.isArray(raw.attackHistory) ? raw.attackHistory.filter(h => h && h.units).slice(-100).map(h => ({ units: normalizeState({ units: h.units }).units, attackCount: finite(h.attackCount) })) : [],
+        pendingTrigger: ['critical', 'draw', 'heal', 'over'].includes(raw.pendingTrigger?.kind) && ['power', 'critical'].includes(raw.pendingTrigger?.stage)
+            ? { kind: raw.pendingTrigger.kind, stage: raw.pendingTrigger.kind === 'critical' ? raw.pendingTrigger.stage : 'power', beforeUnits: normalizeState({ units: raw.pendingTrigger.beforeUnits || units }).units }
+            : null,
+        attackHistory: Array.isArray(raw.attackHistory) ? raw.attackHistory.filter(h => h && h.units).slice(-100).map(h => ({ units: normalizeState({ units: h.units }).units, attackCount: finite(h.attackCount), isMultiSupportMode: h.isMultiSupportMode === true, supportSlots: Array.isArray(h.supportSlots) ? h.supportSlots.filter(slot => slot !== 'front_center' && Object.hasOwn(INITIAL_BOARD, slot)) : [] })) : [],
     };
 };
 const cloneUnits = (units) => Object.fromEntries(Object.entries(units).map(([key, unit]) => [key, { ...unit }]));
@@ -505,6 +517,24 @@ function OfficialSymbol({ kind }) {
     </svg>;
 }
 
+// Literal official trigger characters stay crisp at any size. No generic pictograms.
+const TRIGGER_GLYPHS = { over: '超', draw: '引', front: '前', heal: '治' };
+const TRIGGER_COLORS = { draw: ['#ffaaa5','#dd4148','#7e1722'], front: ['#ffc0e5','#e15db2','#841455'], heal: ['#b0f6c5','#47bd77','#165d3a'] };
+function TriggerSymbol({ kind }) {
+    if (kind === 'critical') return <svg className="trigger-symbol trigger-critical-symbol" viewBox={SYMBOL_BOXES.critical} aria-hidden="true" focusable="false"><image href={SYMBOL_ATLAS} width="1254" height="1254" /></svg>;
+    const colors = TRIGGER_COLORS[kind] || ['#79e6ed','#df7f92','#f6d460'];
+    const gradient = 'trigger-letter-' + kind;
+    return <svg className="trigger-symbol trigger-kanji-symbol" viewBox="0 0 96 96" aria-hidden="true" focusable="false">
+        <defs><linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1">{colors.map((color,index) => <stop key={color} offset={index / (colors.length - 1)} stopColor={color} />)}</linearGradient></defs>
+        <path d="M10 47 77 38 88 50 88 80 21 90 10 78Z" fill="#070d18" stroke="#cdb55c" strokeWidth="2" />
+        <path d="M21 60 88 50M21 60 21 90" fill="none" stroke="#a89042" strokeWidth="1.4" />
+        <g transform="translate(0 -2) skewY(-9)">
+            <text x="48" y="81" className="trigger-kanji" textAnchor="middle" fill="#0b1120" stroke="#ad913d" strokeWidth="3">{TRIGGER_GLYPHS[kind]}</text>
+            <text x="48" y="71" className="trigger-kanji" textAnchor="middle" fill={'url(#' + gradient + ')'} stroke="#e6ce78" strokeWidth="1.5" paintOrder="stroke">{TRIGGER_GLYPHS[kind]}</text>
+        </g>
+    </svg>;
+}
+
 function GradePicker({ slot, unit, anchor, t, onSelect, onClose }) {
     const [custom, setCustom] = useState(String(unit.grade));
     const dialogRef = useRef(null);
@@ -533,12 +563,13 @@ function GradePicker({ slot, unit, anchor, t, onSelect, onClose }) {
     const top = Math.max(8, Math.min(anchor.bottom + 4, window.innerHeight - 232));
     return <div ref={dialogRef} role="dialog" aria-label={t.edit_grade} className="grade-picker" style={{ left, top, width }} data-testid="grade-picker" onClick={e => e.stopPropagation()}>
         <div className="grade-picker-heading"><span>{t.edit_grade}</span><button type="button" aria-label={t.close} onClick={onClose}><X size={16} /></button></div>
-        <div className="grade-options">{[0, 1, 2, 3, 4].map(grade => <button type="button" key={grade} data-grade={grade} aria-pressed={unit.grade === grade} onClick={() => apply(grade)}><b>{grade}</b>{slot === 'front_center' && <span>{formatNumber(GRADE_PRESETS[grade] ?? DEFAULT_GRADE_PRESETS[grade])}</span>}</button>)}</div>
+        <div className="grade-options">{[0, 1, 2, 3, 4].map(grade => <button type="button" key={grade} data-grade={grade} aria-pressed={unit.grade === grade} onClick={() => apply(grade)}><b>{grade}</b><span>{formatNumber(grade === 0 && slot !== 'front_center' ? REAR_GRADE_ZERO_POWER : GRADE_PRESETS[grade] ?? DEFAULT_GRADE_PRESETS[grade])}</span></button>)}</div>
+        {slot !== 'front_center' && <div className="rear-zero-options">{[5000, 6000].map(power => <button type="button" key={power} onClick={() => { onSelect(slot, 0, power); onClose(); }}>0 · {formatNumber(power)}</button>)}</div>}
         <form className="grade-custom" onSubmit={e => { e.preventDefault(); apply(custom); }}><input type="number" min="0" max="99" inputMode="numeric" aria-label={t.custom_grade} value={custom} onChange={e => setCustom(e.target.value)} /><button type="submit">{t.set_base}</button></form>
     </div>;
 }
 
-const INTERFACE_COPY = {"zh":{"turn_controls":"回合操作","defense":"防御计算","settings":"设置","close":"关闭","roll_dice":"掷骰子","flip_coin":"抛硬币","heads":"正面","tails":"反面","rolling":"投掷中","counter":"自由计数器","counter_name":"计数器名称","decrease":"减少","increase":"增加","remove_counter":"删除计数器","grade_presets":"先导者力量预设","unit_status":"状态标记","front_attack":"前排攻击","back_attack":"后排攻击","critical_down":"减少暴击","critical_up":"增加暴击","back_row_attack_mode":"后排可攻"},"en":{"turn_controls":"Turn controls","defense":"Guard calculator","settings":"Settings","close":"Close","roll_dice":"Roll die","flip_coin":"Flip coin","heads":"Heads","tails":"Tails","rolling":"Rolling","counter":"Custom counter","counter_name":"Counter name","decrease":"Decrease","increase":"Increase","remove_counter":"Remove counter","grade_presets":"Vanguard power presets","unit_status":"Abilities","front_attack":"Front attack","back_attack":"Back attack","critical_down":"Decrease critical","critical_up":"Increase critical","back_row_attack_mode":"Rear enabled"},"ja":{"turn_controls":"ターン操作","defense":"ガード計算","settings":"設定","close":"閉じる","roll_dice":"サイコロを振る","flip_coin":"コイントス","heads":"表","tails":"裏","rolling":"抽選中","counter":"フリーカウンター","counter_name":"カウンター名","decrease":"減らす","increase":"増やす","remove_counter":"カウンターを削除","grade_presets":"ヴァンガードのパワー設定","unit_status":"能力","front_attack":"前列アタック","back_attack":"後列アタック","critical_down":"クリティカルを減らす","critical_up":"クリティカルを増やす","back_row_attack_mode":"後列攻撃可"}};
+const INTERFACE_COPY = {"zh":{"turn_controls":"回合操作","defense":"防御计算","settings":"设置","close":"关闭","roll_dice":"掷骰子","flip_coin":"抛硬币","heads":"正面","tails":"反面","rolling":"投掷中","counter":"自由计数器","counter_name":"计数器名称","decrease":"减少","increase":"增加","remove_counter":"删除计数器","grade_presets":"单位力量预设","unit_status":"状态标记","front_attack":"前排攻击","back_attack":"后排攻击","critical_down":"减少暴击","critical_up":"增加暴击","back_row_attack_mode":"后排可攻"},"en":{"turn_controls":"Turn controls","defense":"Guard calculator","settings":"Settings","close":"Close","roll_dice":"Roll die","flip_coin":"Flip coin","heads":"Heads","tails":"Tails","rolling":"Rolling","counter":"Custom counter","counter_name":"Counter name","decrease":"Decrease","increase":"Increase","remove_counter":"Remove counter","grade_presets":"Unit power presets","unit_status":"Abilities","front_attack":"Front attack","back_attack":"Back attack","critical_down":"Decrease critical","critical_up":"Increase critical","back_row_attack_mode":"Rear enabled"},"ja":{"turn_controls":"ターン操作","defense":"ガード計算","settings":"設定","close":"閉じる","roll_dice":"サイコロを振る","flip_coin":"コイントス","heads":"表","tails":"裏","rolling":"抽選中","counter":"フリーカウンター","counter_name":"カウンター名","decrease":"減らす","increase":"増やす","remove_counter":"カウンターを削除","grade_presets":"ユニットのパワー設定","unit_status":"能力","front_attack":"前列アタック","back_attack":"後列アタック","critical_down":"クリティカルを減らす","critical_up":"クリティカルを増やす","back_row_attack_mode":"後列攻撃可"}};
 const PLAYMAT_COPY = {
     zh: { stride: '超越', turn_end: '回合结束', free_support: '自由支援', back_intercept: '后列截击', custom_grade: '自定等级', buff_short: '修', pg_button: '完全防御', pg_off: '取消完全防御', shield_value: '盾值', intercepting: '已加入G区', settle_guard: '结算', cancel_guard: '取消', guard_circle: 'G区', guarded_power: '防御合计', guard_need: '还需盾值', guard_success: '防御成功', guard_failed: '防御不足', stand: '竖置', unit_status: '能力', invalid_intercept: '该单位目前不能截击', fixed_vanguard: '先导者不参与换位', moving: '换位中', move_done: '已换位', opponent_atk: '对方攻击力', manual_shield: '手牌盾值', rear_attack: '后排攻击' },
     en: { stride: 'Stride', turn_end: 'Turn end', free_support: 'Free boost', back_intercept: 'Rear intercept', custom_grade: 'Custom grade', buff_short: 'Mod', pg_button: 'Perfect guard', pg_off: 'Cancel PG', shield_value: 'Shield', intercepting: 'In guard circle', settle_guard: 'Resolve', cancel_guard: 'Cancel', guard_circle: 'Guard circle', guarded_power: 'Total defense', guard_need: 'Shield needed', guard_success: 'Guard successful', guard_failed: 'More shield needed', stand: 'Stand', unit_status: 'Abilities', invalid_intercept: 'This unit cannot intercept now', fixed_vanguard: 'The Vanguard cannot swap positions', moving: 'Moving', move_done: 'Swapped', opponent_atk: 'Opponent power', manual_shield: 'Shield from hand', rear_attack: 'Rear attack' },
@@ -600,6 +631,8 @@ export default function App() {
     const suppressClickUntil = useRef(0);
     const [swapSource, setSwapSource] = useState(null);
     const [showTools, setShowTools] = useState(false);
+    const [wideScreen, setWideScreen] = useState(() => window.innerWidth >= 1040);
+    const [triggerFlash, setTriggerFlash] = useState(false);
     const [manualInput, setManualInput] = useState("");
     const [customBasePower, setCustomBasePower] = useState("");
     const opponentAttackPower = gameState.opponentPower;
@@ -638,6 +671,16 @@ export default function App() {
     const t = { ...(TRANSLATIONS[language] || TRANSLATIONS.zh), ...(INTERFACE_COPY[language] || INTERFACE_COPY.zh), ...(PLAYMAT_COPY[language] || PLAYMAT_COPY.zh) };
 
     const getUnitPower = (unit) => (unit?.basePower || 0) + (unit?.powerBuff || 0);
+    useEffect(() => {
+        const resize = () => setWideScreen(window.innerWidth >= 1040);
+        window.addEventListener('resize', resize);
+        return () => window.removeEventListener('resize', resize);
+    }, []);
+    useEffect(() => {
+        if (!triggerFlash) return;
+        const timer = setTimeout(() => setTriggerFlash(false), 600);
+        return () => clearTimeout(timer);
+    }, [triggerFlash]);
 
     // 计算单位的 G 级别将由 detectGradeFromPower 决定（基于可编辑的 GRADE_PRESETS）
 
@@ -656,6 +699,7 @@ export default function App() {
                 GRADE_PRESETS = Array.isArray(savedPresets) && savedPresets.length && !usesLegacyDefaults ? savedPresets.slice(0, 32).map(v => Math.max(0, finite(v))) : [...DEFAULT_GRADE_PRESETS];
                 stateRef.current = restored;
                 setGameState(restored);
+                if (restored.pendingTrigger || restored.guardSlots.length) setShowGuard(true);
                 setLanguage(TRANSLATIONS[loadedState?.language] ? loadedState.language : 'zh');
             }
         } catch (e) {
@@ -686,7 +730,7 @@ export default function App() {
     };
 
     useEffect(() => {
-        const modal = selectedSlot || showTools;
+        const modal = selectedSlot || (showTools && !wideScreen);
         const previous = document.body.style.overflow;
         if (modal) document.body.style.overflow = 'hidden';
         const previousFocus = document.activeElement;
@@ -694,6 +738,8 @@ export default function App() {
             if (event.key === 'Escape') {
                 setSelectedSlot(null); setShowTools(false); setShowTopControls(false);
                 setShowAttackAdjust(false); setSwapSource(null); setDragState(null); setPowerEditor(null);
+                if (stateRef.current.pendingTrigger) cancelTrigger();
+                if (stateRef.current.isMultiSupportMode) cancelFreeSupport();
                 if (gestureRef.current) clearTimeout(gestureRef.current.timer);
                 gestureRef.current = null;
             }
@@ -708,15 +754,15 @@ export default function App() {
         if (modal) document.querySelector(selectedSlot ? '.unit-drawer [data-testid="unit-close"]' : '.tools-panel button')?.focus();
         document.addEventListener('keydown', close);
         return () => { if (modal) document.body.style.overflow = previous; document.removeEventListener('keydown', close); if (modal) previousFocus?.focus(); };
-    }, [selectedSlot, showTools, showTopControls]);
+    }, [selectedSlot, showTools, showTopControls, wideScreen]);
 
     useEffect(() => () => { if (gestureRef.current) clearTimeout(gestureRef.current.timer); }, []);
 
     // --- Logic ---
     const vanguardUnit = gameState.units.front_center || INITIAL_UNIT;
     const vanguardPower = getUnitPower(vanguardUnit);
-    const interceptShield = gameState.guardSlots.reduce((sum, slot) => sum + gameState.units[slot].shield, 0);
-    const currentGuard = gameState.resources.shield + interceptShield;
+    const interceptShield = gameState.guardSlots.reduce((sum, slot) => sum + Math.max(0, finite(gameState.units[slot]?.shield)), 0);
+    const currentGuard = Math.max(0, finite(gameState.resources.shield)) + interceptShield;
 
     const { required5kIncrements, currentAttackTarget, isDifferenceMode } = useMemo(() => {
         const isManualInput = opponentAttackPower != null;
@@ -801,6 +847,7 @@ export default function App() {
     }, [modifyUnit, gameState.isMultiSupportMode, gameState.units, updateState]);
 
     const toggleSupport = slot => {
+        if (stateRef.current.isMultiSupportMode) { selectFreeSupport(slot); return; }
         const unit = stateRef.current.units[slot];
         if (unit.isRested || !unit.hasBoost || getUnitPower(unit) <= 0 || stateRef.current.guardSlots.includes(slot)) return;
         if (!slot.startsWith('back') && !stateRef.current.isMultiSupportMode) return;
@@ -808,13 +855,15 @@ export default function App() {
     };
 
     const handleAttackUndo = () => {
-        if (gameState.attackHistory.length === 0) return;
-        const lastState = gameState.attackHistory[gameState.attackHistory.length - 1];
-        const newHistory = gameState.attackHistory.slice(0, -1);
+        const current = stateRef.current;
+        if (current.pendingTrigger || current.isMultiSupportMode || current.attackHistory.length === 0) return;
+        const lastState = current.attackHistory[current.attackHistory.length - 1];
+        const newHistory = current.attackHistory.slice(0, -1);
         updateState({
             units: lastState.units,
             attackCount: lastState.attackCount,
-            attackHistory: newHistory
+            attackHistory: newHistory,
+            isMultiSupportMode: lastState.isMultiSupportMode, supportSlots: [...lastState.supportSlots]
         });
         setSelectedSlot(null);
     };
@@ -825,7 +874,7 @@ export default function App() {
         if (attackerSlot !== frontSlot && attackerSlot !== backSlot) return;
         const attacker = current.units[attackerSlot];
         if (!attacker || current.guardSlots.includes(attackerSlot) || attacker.isRested || getUnitPower(attacker) <= 0 || (attackerSlot === backSlot && !attacker.isBackRowAttack)) return;
-        const historyEntry = { units: cloneUnits(current.units), attackCount: current.attackCount };
+        const historyEntry = { units: cloneUnits(current.units), attackCount: current.attackCount, isMultiSupportMode: current.isMultiSupportMode, supportSlots: [...current.supportSlots] };
         const newUnits = cloneUnits(current.units);
 
         // Mark attacker as rested and cancel its support
@@ -833,8 +882,8 @@ export default function App() {
 
         if (current.isMultiSupportMode) {
             // Multi-Support Mode: 横置所有当前支援单位（除了已横置的 attacker）
-            Object.keys(newUnits).forEach(key => {
-                if (key !== attackerSlot && !current.guardSlots.includes(key) && newUnits[key].hasBoost && newUnits[key].isSupporting && !newUnits[key].isRested) {
+            current.supportSlots.forEach(key => {
+                if (key !== attackerSlot && isFreeSupportTarget(key, current)) {
                     newUnits[key] = { ...newUnits[key], isRested: true, isSupporting: false };
                 }
             });
@@ -847,7 +896,7 @@ export default function App() {
             }
         }
 
-        updateState({ units: newUnits, attackCount: current.attackCount + 1, attackHistory: [...current.attackHistory, historyEntry].slice(-100) });
+        updateState({ units: newUnits, attackCount: current.attackCount + 1, attackHistory: [...current.attackHistory, historyEntry].slice(-100), isMultiSupportMode: false, supportSlots: [] });
         setSelectedSlot(null);
     };
 
@@ -966,8 +1015,9 @@ export default function App() {
     const canIntercept = slot => {
         const current = stateRef.current;
         const unit = current.units[slot];
-        return unit && slot !== 'front_center' && unit.hasIntercept && getUnitPower(unit) > 0 &&
-            (!slot.startsWith('back') || current.allowBackIntercept);
+        const back = slot.startsWith('back');
+        return unit && slot !== 'front_center' && getUnitPower(unit) > 0 &&
+            (back ? current.allowBackIntercept : unit.hasIntercept);
     };
 
     const addToGuard = slot => {
@@ -982,6 +1032,8 @@ export default function App() {
 
     const handleSlotClick = slot => {
         if (Date.now() < suppressClickUntil.current) return;
+        if (stateRef.current.pendingTrigger) { resolveTriggerTarget(slot); return; }
+        if (stateRef.current.isMultiSupportMode) { selectFreeSupport(slot); return; }
         if (swapSource) { swapSlots(swapSource, slot); return; }
         setCustomBasePower(''); setManualInput(''); setPowerEditor(null); setGradeEditor(null);
         setShowTools(false); setShowAttackAdjust(false);
@@ -989,7 +1041,7 @@ export default function App() {
     };
 
     const startHold = (slot, x, y, pointerId = null) => {
-        if (stateRef.current.guardSlots.includes(slot)) return;
+        if (stateRef.current.pendingTrigger || stateRef.current.isMultiSupportMode || stateRef.current.guardSlots.includes(slot)) return;
         if (gestureRef.current) clearTimeout(gestureRef.current.timer);
         const gesture = { slot, x, y, pointerId, active: false, moved: false, timer: null };
         gesture.timer = setTimeout(() => {
@@ -1099,14 +1151,71 @@ export default function App() {
     };
 
 
-    const setUnitGrade = (slot, grade) => {
+    const setUnitGrade = (slot, grade, baseOverride) => {
         const nextGrade = Math.min(99, Math.max(0, Math.trunc(finite(grade))));
-        modifyUnit(slot, { grade: nextGrade, hasBoost: nextGrade <= 1, hasIntercept: slot !== 'front_center' && nextGrade === 2, hasDoubleStrike: nextGrade === 3, hasTripleStrike: nextGrade >= 4,
-            ...(slot === 'front_center' && GRADE_PRESETS[nextGrade] !== undefined ? { basePower: GRADE_PRESETS[nextGrade], isStriding: false, heart: null } : {}) });
+        const isVanguard = slot === 'front_center';
+        const power = baseOverride ?? (nextGrade === 0 && !isVanguard ? REAR_GRADE_ZERO_POWER : GRADE_PRESETS[nextGrade]);
+        modifyUnit(slot, { grade: nextGrade, hasBoost: nextGrade <= 1, hasIntercept: !isVanguard && nextGrade === 2, hasDoubleStrike: isVanguard && nextGrade === 3, hasTripleStrike: isVanguard && nextGrade >= 4,
+            ...(power !== undefined ? { basePower: power, isStriding: false, heart: null } : {}) });
+    };
+
+    const triggerNames = {
+        zh: { critical: '暴击触发', draw: '抽牌触发', front: '前列触发', heal: '治疗触发', over: '超触发', power: '选择力量对象', crit: '选择暴击对象', cancel: '撤销触发' },
+        en: { critical: 'Critical trigger', draw: 'Draw trigger', front: 'Front trigger', heal: 'Heal trigger', over: 'Over trigger', power: 'Choose power target', crit: 'Choose critical target', cancel: 'Undo trigger' },
+        ja: { critical: 'クリティカルトリガー', draw: 'ドロートリガー', front: 'フロントトリガー', heal: 'ヒールトリガー', over: 'オーバートリガー', power: 'パワー対象を選択', crit: 'クリティカル対象を選択', cancel: 'トリガーを取り消す' },
+    }[language];
+    const actionCopy = {
+        zh: { attack: '攻击', choose_support: '选择支援', cancel_support: '取消支援选择', undo: '撤销攻击' },
+        en: { attack: 'Attack', choose_support: 'Choose boosters', cancel_support: 'Cancel booster selection', undo: 'Undo attack' },
+        ja: { attack: 'アタック', choose_support: 'ブーストを選択', cancel_support: 'ブースト選択を取消', undo: 'アタック取消' },
+    }[language];
+    const isFreeSupportTarget = (slot, state = stateRef.current) => canSelectFreeSupport(slot, state.units, state.guardSlots);
+    const cancelFreeSupport = () => updateState({ isMultiSupportMode: false, supportSlots: [] });
+    const toggleFreeSupport = () => {
+        if (stateRef.current.pendingTrigger) return;
+        if (stateRef.current.isMultiSupportMode) { cancelFreeSupport(); return; }
+        setSelectedSlot(null); setGradeEditor(null); setShowTools(false); setSwapSource(null);
+        updateState({ isMultiSupportMode: true, supportSlots: [] });
+    };
+    const selectFreeSupport = slot => {
+        const current = stateRef.current;
+        if (!current.isMultiSupportMode || !isFreeSupportTarget(slot, current)) return;
+        updateState({ supportSlots: current.supportSlots.includes(slot) ? current.supportSlots.filter(id => id !== slot) : [...current.supportSlots, slot] });
+    };
+    const isTriggerTarget = (slot, state = stateRef.current) => getUnitPower(state.units[slot]) !== 0 && !state.guardSlots.includes(slot);
+    const cancelTrigger = () => {
+        const pending = stateRef.current.pendingTrigger;
+        if (pending) updateState({ units: cloneUnits(pending.beforeUnits), pendingTrigger: null });
+    };
+    const beginTrigger = kind => {
+        const current = stateRef.current;
+        if (current.pendingTrigger || current.isMultiSupportMode) return;
+        setSelectedSlot(null); setShowTools(false); setGradeEditor(null); setSwapSource(null);
+        if (kind === 'front') {
+            const units = cloneUnits(current.units);
+            ['front_left', 'front_center', 'front_right'].filter(slot => isTriggerTarget(slot, current)).forEach(slot => { units[slot].powerBuff += 10000; });
+            updateState({ units }); setTriggerFlash(true);
+        } else if (Object.keys(current.units).some(slot => isTriggerTarget(slot, current))) {
+            updateState({ pendingTrigger: { kind, stage: 'power', beforeUnits: cloneUnits(current.units) } });
+        }
+    };
+    const resolveTriggerTarget = slot => {
+        const current = stateRef.current;
+        const pending = current.pendingTrigger;
+        if (!pending || !isTriggerTarget(slot, current)) return;
+        const units = cloneUnits(current.units);
+        if (pending.stage === 'critical') {
+            units[slot].crit += 1;
+            updateState({ units, pendingTrigger: null });
+        } else {
+            units[slot].powerBuff += pending.kind === 'over' ? OT_BUFF_VALUE : 10000;
+            if (pending.kind === 'over') units[slot].otActive = true;
+            updateState({ units, pendingTrigger: pending.kind === 'critical' ? { ...pending, stage: 'critical' } : null });
+        }
     };
     const togglePanel = panel => {
         if (panel === 'turn') { setShowTopControls(current => !current); return; }
-        if (panel === 'guard') { setShowGuard(current => !current); return; }
+        if (panel === 'guard') { if (showGuard && stateRef.current.pendingTrigger) cancelTrigger(); setShowGuard(current => !current); return; }
         setSelectedSlot(null); setGradeEditor(null); setShowAttackAdjust(false);
         setShowTools(panel === 'tools' && !showTools);
     };
@@ -1144,11 +1253,20 @@ export default function App() {
         const selected = selectedSlot === id;
         const target = dragState?.target === id;
         const source = swapSource === id;
+        const triggerStage = gameState.pendingTrigger && isTriggerTarget(id, gameState) ? gameState.pendingTrigger.stage : null;
+        const supportTarget = gameState.isMultiSupportMode && isFreeSupportTarget(id, gameState);
+        const supportSelected = gameState.isMultiSupportMode && gameState.supportSlots.includes(id);
+        const activeSupport = gameState.isMultiSupportMode ? supportSelected : unit.isSupporting;
         const border = selected ? 'border-yellow-400' : source || target ? 'border-blue-500' : isVanguardSlot ? 'border-red-500' : 'border-slate-800';
         const tone = selected ? 'bg-slate-800' : source || target ? 'bg-blue-900/20' : unit.isRested ? 'bg-slate-950/90 opacity-40' : unit.isSupporting ? 'bg-green-900/20' : isVanguardSlot ? 'bg-red-950/20' : 'bg-slate-900/80';
         const numberTone = unit.otActive ? 'rainbow-text' : isVanguardSlot ? 'text-blue-400' : power > 0 ? 'text-yellow-400' : power < 0 ? 'text-red-500' : 'text-slate-400';
         return <div key={id} role="group" tabIndex={0} aria-label={label + ' ' + formatNumber(power)}
             data-testid={'unit-' + id} data-slot={id} data-value={power} data-reserved={reserved}
+            data-rested={unit.isRested}
+            data-trigger-stage={triggerStage || undefined}
+            data-selection={selected || source || target || !!triggerStage || supportTarget ? 'true' : undefined}
+            data-support-target={supportTarget || undefined} data-support-selected={supportSelected || undefined}
+            onClickCapture={e => { if (stateRef.current.pendingTrigger || stateRef.current.isMultiSupportMode) { e.stopPropagation(); e.preventDefault(); handleSlotClick(id); } }}
             onClick={() => handleSlotClick(id)}
             onKeyDown={e => {
                 if (e.target !== e.currentTarget) return;
@@ -1158,18 +1276,21 @@ export default function App() {
             onPointerDown={e => { if (e.pointerType === 'touch' || e.button !== 0 || e.target.closest('button,input')) return; startHold(id, e.clientX, e.clientY, e.pointerId ?? 1); }}
             onTouchStart={e => { if (e.target.closest('button,input') || e.touches.length !== 1) return; const point = e.touches[0]; startHold(id, point.clientX, point.clientY); }}
             onContextMenu={e => e.preventDefault()}
-            className={'unit-slot relative rounded-lg border-2 select-none ' + border + ' ' + tone + (unit.otActive ? ' rainbow-glow' : '') + (reserved ? ' unit-reserved' : '')}>
+            className={'unit-slot relative rounded-lg border-2 select-none ' + border + ' ' + tone + (unit.otActive ? ' rainbow-glow' : '') + (reserved ? ' unit-reserved' : '') + (triggerFlash && id.startsWith('front') && isTriggerTarget(id, gameState) ? ' trigger-flash' : '')}>
             <span aria-hidden="true" className={'unit-circle ' + (isVanguardSlot ? 'circle-vanguard' : 'circle-rearguard')} />
             <div className="slot-topline">
                 <div className="slot-abilities">
-                    {unit.hasBoost && (supportable ? <button type="button" data-testid={'boost-' + id} aria-label={unit.isSupporting ? t.support_off : t.boost} aria-pressed={unit.isSupporting} disabled={unit.isRested || power <= 0 || reserved} className={'slot-symbol-button ' + (unit.isSupporting ? 'is-supporting' : '')} onClick={e => { e.stopPropagation(); toggleSupport(id); }}><OfficialSymbol kind="boost" /></button> : <span title={t.boost}><OfficialSymbol kind="boost" /></span>)}
-                    {id.startsWith('back') && power > 0 && <button type="button" aria-label={t.rear_attack} aria-pressed={unit.isBackRowAttack} className={'slot-symbol-button ' + (unit.isBackRowAttack ? 'is-attacking' : '')} onClick={e => { e.stopPropagation(); modifyUnit(id, { isBackRowAttack: !unit.isBackRowAttack, isSupporting: false }); }}><Sword size={15} /></button>}
+                    {(unit.hasIntercept || (id.startsWith('back') && gameState.allowBackIntercept && power !== 0)) && <span title={t.intercept}><OfficialSymbol kind="intercept" /></span>}
+                    {unit.hasDoubleStrike && <span title={t.double_strike}><OfficialSymbol kind="doubleDrive" /></span>}
+                    {unit.hasTripleStrike && <span title={t.triple_strike}><OfficialSymbol kind="tripleDrive" /></span>}
+                    {unit.hasBoost && (supportable ? <button type="button" data-testid={'boost-' + id} aria-label={activeSupport ? t.support_off : t.boost} aria-pressed={activeSupport} disabled={unit.isRested || power <= 0 || reserved} className={'slot-symbol-button ' + (activeSupport ? 'is-supporting' : '')} onClick={e => { e.stopPropagation(); toggleSupport(id); }}><OfficialSymbol kind="boost" /></button> : <span title={t.boost}><OfficialSymbol kind="boost" /></span>)}
                 </div>
                 <button type="button" data-grade-toggle data-testid={'grade-' + id} aria-label={label + ' ' + t.edit_grade} className="slot-grade" onClick={e => openGrade(e, id)}>{unit.grade}</button>
             </div>
             <PowerNumber value={power} maxSize={power.toString().length > 8 ? 22 : 34} resetKey={id} className={'unit-power font-mono ' + numberTone} />
-            <div className="slot-critical">{unit.hasIntercept && <span title={t.intercept}><OfficialSymbol kind="intercept" /></span>}{unit.hasDoubleStrike && <span title={t.double_strike}><OfficialSymbol kind="doubleDrive" /></span>}{unit.hasTripleStrike && <span title={t.triple_strike}><OfficialSymbol kind="tripleDrive" /></span>}{unit.crit !== 1 && <><OfficialSymbol kind="critical" /><span>{unit.crit}</span></>}{reserved && <OfficialSymbol kind="intercept" />}</div>
-            <div className="slot-actions">
+            <div className="slot-critical">{unit.crit !== 1 && <><OfficialSymbol kind="critical" /><span>{unit.crit}</span></>}{reserved && <OfficialSymbol kind="intercept" />}</div>
+            <div className={'slot-actions' + (id.startsWith('back') && power > 0 ? ' slot-rear-actions' : '')}>
+                {id.startsWith('back') && power > 0 && <button type="button" aria-label={t.rear_attack} aria-pressed={unit.isBackRowAttack} disabled={reserved} className={'slot-symbol-button ' + (unit.isBackRowAttack ? 'is-attacking' : '')} onClick={e => { e.stopPropagation(); modifyUnit(id, { isBackRowAttack: !unit.isBackRowAttack, isSupporting: false }); }}><Sword size={15} /></button>}
                 <button type="button" aria-label={t.rest} disabled={unit.isRested || reserved} onClick={e => { e.stopPropagation(); restUnit(id); }}><OfficialSymbol kind="rest" /></button>
                 <button type="button" aria-label={t.stand} disabled={!unit.isRested || reserved} onClick={e => { e.stopPropagation(); standUnit(id); }}><OfficialSymbol kind="stand" /></button>
                 <button type="button" aria-label={t.retire} disabled={reserved || isVanguardSlot} className="text-red-500" onClick={e => { e.stopPropagation(); handleRetire(id); }}><Trash2 size={14} /></button>
@@ -1178,25 +1299,29 @@ export default function App() {
     };
 
     const renderTurnPanel = () => <aside className="turn-panel" role="region" aria-label={t.turn_controls} id="top-controls">
-        <div className="turn-actions">
-            <button type="button" data-testid="ride-action" disabled={vanguardUnit.grade >= 4 || vanguardUnit.isStriding} onClick={rideNextGrade} className="bg-blue-900/50 text-blue-300 border border-blue-700">{vanguardUnit.grade >= 3 ? t.stride : t.ride_next}</button>
-            <button type="button" onClick={() => applyFrontRowBuff(10000)} className="bg-purple-700/50 text-purple-300 border border-purple-600">{t.front_buff}</button>
-            <button type="button" onClick={handleTurnStart} className="bg-green-800/50 text-green-300 border border-green-700"><OfficialSymbol kind="stand" />{t.turn_start}</button>
-            <button type="button" onClick={roundStateReset} className="bg-red-800/50 text-red-300 border border-red-700">{t.turn_end}</button>
-            <button type="button" data-testid="free-support" aria-pressed={gameState.isMultiSupportMode} onClick={() => updateState({ isMultiSupportMode: !stateRef.current.isMultiSupportMode })} className={gameState.isMultiSupportMode ? 'bg-orange-600/50 text-white border border-orange-400' : 'bg-slate-900 text-slate-400 border border-slate-700'}><OfficialSymbol kind="boost" />{t.free_support}</button>
+        <button type="button" className="turn-close" aria-label={t.close} onClick={() => setShowTopControls(false)}><X size={14} /></button>
+        <div className="turn-actions" inert={gameState.pendingTrigger ? true : undefined}>
+            <button type="button" disabled={gameState.isMultiSupportMode} onClick={handleTurnStart} className="bg-green-800/50 text-green-300 border border-green-700"><OfficialSymbol kind="stand" />{t.turn_start}</button>
+            <button type="button" data-testid="ride-action" disabled={gameState.isMultiSupportMode || vanguardUnit.grade >= 4 || vanguardUnit.isStriding} onClick={rideNextGrade} className="bg-blue-900/50 text-blue-300 border border-blue-700">{vanguardUnit.grade >= 3 ? t.stride : t.ride_next}</button>
+            <button type="button" disabled={gameState.isMultiSupportMode} onClick={() => applyFrontRowBuff(10000)} className="bg-purple-700/50 text-purple-300 border border-purple-600">{t.front_buff}</button>
+            <button type="button" disabled={gameState.isMultiSupportMode} onClick={roundStateReset} className="bg-red-800/50 text-red-300 border border-red-700">{t.turn_end}</button>
+            <button type="button" data-testid="free-support" aria-pressed={gameState.isMultiSupportMode} onClick={toggleFreeSupport} className={gameState.isMultiSupportMode ? 'bg-orange-600/50 text-white border border-orange-400' : 'bg-slate-900 text-slate-400 border border-slate-700'}><OfficialSymbol kind="boost" />{t.free_support}</button>
             <button type="button" data-testid="back-intercept" aria-pressed={gameState.allowBackIntercept} onClick={() => updateState({ allowBackIntercept: !stateRef.current.allowBackIntercept })} className={gameState.allowBackIntercept ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-slate-900 text-slate-400 border border-slate-700'}><OfficialSymbol kind="intercept" />{t.back_intercept}</button>
+            <button type="button" data-testid="attack-undo" disabled={gameState.attackHistory.length === 0 || !!gameState.pendingTrigger || gameState.isMultiSupportMode} onClick={handleAttackUndo} className="bg-yellow-800/30 text-yellow-300 border border-yellow-800"><RotateCcw size={14} />{actionCopy.undo}</button>
         </div>
     </aside>;
 
     const renderGuardCircle = () => <div className={'guard-circle-row ' + (dragState?.target === 'guard' ? 'is-drop-target' : '')}>
+        {['critical', 'draw', 'over', 'heal', 'front'].map(kind => <button type="button" key={kind} className={'trigger-button trigger-' + kind} data-testid={'trigger-' + kind} aria-label={triggerNames[kind]} title={triggerNames[kind]} aria-pressed={gameState.pendingTrigger?.kind === kind} disabled={!!gameState.pendingTrigger || gameState.isMultiSupportMode} onClick={() => beginTrigger(kind)}><TriggerSymbol kind={kind} /></button>)}
         <div role="group" tabIndex={0} aria-label={t.guard_circle + ' ' + formatNumber(currentGuard)} data-testid="guard-circle" data-guard-drop data-value={currentGuard}
-            className="guard-circle" onClick={() => { setPowerEditor(null); setSelectedSlot('guard'); setGradeEditor(null); setShowTools(false); }}
-            onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setSelectedSlot('guard'); } }}>
+            className="guard-circle" onClick={() => { if (gameState.pendingTrigger || gameState.isMultiSupportMode) return; setPowerEditor(null); setSelectedSlot('guard'); setGradeEditor(null); setShowTools(false); }}
+            onKeyDown={e => { if (!gameState.pendingTrigger && !gameState.isMultiSupportMode && e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setSelectedSlot('guard'); } }}>
             <span aria-hidden="true" className="unit-circle circle-guard" />
             <span className="guard-emblem" aria-hidden="true">G</span>
-            <PowerNumber value={currentGuard} maxSize={30} className="text-green-400" />
+            <PowerNumber value={currentGuard} maxSize={30} className="guard-number" />
         </div>
-        <div className="guard-reservations">{gameState.guardSlots.map(slot => <button type="button" key={slot} data-testid={'guard-reserved-' + slot} aria-label={t.cancel_guard + ' ' + ({ front_left: t.front_l, front_right: t.front_r, back_left: t.back_l, back_center: t.back_c, back_right: t.back_r })[slot]} onClick={() => updateState({ guardSlots: stateRef.current.guardSlots.filter(id => id !== slot) })}><OfficialSymbol kind="intercept" /><span>{formatNumber(gameState.units[slot].shield)}</span><X size={12} /></button>)}</div>
+        {gameState.pendingTrigger && <div className="trigger-choice" role="status"><span>{gameState.pendingTrigger.stage === 'critical' ? triggerNames.crit : triggerNames.power}</span><button type="button" data-testid="trigger-cancel" aria-label={triggerNames.cancel} onClick={cancelTrigger}><X size={14} /></button></div>}
+        <div className="guard-reservations">{gameState.guardSlots.map(slot => <button type="button" key={slot} disabled={!!gameState.pendingTrigger} data-testid={'guard-reserved-' + slot} aria-label={t.cancel_guard + ' ' + ({ front_left: t.front_l, front_right: t.front_r, back_left: t.back_l, back_center: t.back_c, back_right: t.back_r })[slot]} onClick={() => updateState({ guardSlots: stateRef.current.guardSlots.filter(id => id !== slot) })}><OfficialSymbol kind="intercept" /><span>{formatNumber(gameState.units[slot].shield)}</span><X size={12} /></button>)}</div>
     </div>;
 
     const renderGuardDrawer = () => <div className="drawer-backdrop" onClick={() => setSelectedSlot(null)}><div className="unit-drawer guard-drawer fixed bottom-0 inset-x-0 bg-[#0b1120] border-t border-slate-700 rounded-t-2xl z-50" role="dialog" aria-modal="true" aria-label={t.defense} onClick={e => e.stopPropagation()}>
@@ -1219,35 +1344,32 @@ export default function App() {
         const attacker = gameState.units[attackerId];
         const otherId = attackerId === frontId ? backId : frontId;
         const supports = gameState.isMultiSupportMode
-            ? Object.entries(gameState.units).filter(([id, unit]) => id !== attackerId && !gameState.guardSlots.includes(id) && unit.hasBoost && unit.isSupporting && !unit.isRested)
+            ? gameState.supportSlots.filter(id => id !== attackerId && isFreeSupportTarget(id, gameState)).map(id => [id, gameState.units[id]])
             : !gameState.guardSlots.includes(otherId) && gameState.units[otherId].hasBoost && gameState.units[otherId].isSupporting && !gameState.units[otherId].isRested ? [[otherId, gameState.units[otherId]]] : [];
         const supportPower = supports.reduce((sum, [, unit]) => sum + getUnitPower(unit), 0);
         return { power: getUnitPower(attacker) + supportPower, supported: supportPower > 0 };
     };
     const TotalPowerDisplay = ({ frontId, backId, attackerId = frontId }) => {
         const { power, supported } = getAttackDetails(frontId, backId, attackerId);
-        return <div className="column-total h-10 bg-slate-900/50 border border-slate-700 rounded-lg p-1.5 flex flex-col items-center justify-center" data-testid={`total-${attackerId}`} data-value={power}>
-            <div className="text-[9px] text-slate-500 uppercase tracking-widest">{supported ? t.column_total_supporting : t.column_total_solo}</div>
+        return <div className="column-total" data-testid={`total-${attackerId}`} data-value={power} data-rested={gameState.units[attackerId].isRested}>
+            <div className="column-total-label">{supported ? t.column_total_supporting : t.column_total_solo}</div>
             <PowerNumber value={power} maxSize={power.toString().length > 8 ? 18 : 22} className={`font-mono ${supported ? 'text-green-400' : 'text-cyan-400'}`} />
         </div>;
     };
     const ColumnAttackButton = ({ frontId, backId, attackerId = frontId, compact = false }) => {
         const attacker = gameState.units[attackerId];
         const isBack = attackerId === backId;
-        const { power, supported } = getAttackDetails(frontId, backId, attackerId);
-        const disabled = gameState.guardSlots.includes(attackerId) || attacker.isRested || getUnitPower(attacker) <= 0 || (isBack && !attacker.isBackRowAttack);
-        const label = hasBackRowAttack ? isBack ? t.back_attack : t.front_attack : supported ? t.attack_support : frontId === 'front_center' ? t.attack_vanguard : t.attack_solo;
+        const disabled = !!gameState.pendingTrigger || gameState.guardSlots.includes(attackerId) || attacker.isRested || getUnitPower(attacker) <= 0 || (isBack && !attacker.isBackRowAttack);
         return <button type="button" data-testid={`attack-${attackerId}`} onClick={() => attackColumn(frontId, backId, attackerId)} disabled={disabled}
             className={`column-attack w-full rounded-lg font-bold text-xs transition-colors border ${compact ? 'attack-between' : 'py-2 mt-1'} ${disabled ? 'bg-slate-900 text-slate-600 border-slate-900 opacity-50' : 'bg-red-800/50 text-red-300 border-red-700 hover:bg-red-700/70 active:scale-[0.98]'}`}>
-            {compact && <PowerNumber value={power} maxSize={20} className="font-mono attack-inline-power" />}
-            <span><Sword size={12} className="inline mr-1" />{label}</span>
+            {actionCopy.attack}
         </button>;
     };
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-cyan-500 font-mono tracking-widest">{t.system_booting}</div>;
 
     return (
-        <div className="vg-app min-h-screen bg-black text-slate-200 font-sans pb-20 overflow-x-hidden" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e293b 0%, #020617 100%)' }}>
+        <div className={'vg-app min-h-screen bg-black text-slate-200 font-sans pb-20 overflow-x-hidden' + (showTopControls ? ' turn-open' : '') + (showTools ? ' tools-open' : '')} style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e293b 0%, #020617 100%)' }}>
             <header className="bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 py-2 flex justify-between items-center shadow-xl sticky top-0 z-40">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-5 bg-cyan-500 rounded-sm shadow-[0_0_8px_#06b6d4]"></div>
@@ -1266,19 +1388,20 @@ export default function App() {
                                     <span className="text-yellow-400 font-bold">{gameState.attackCount}</span>
                                     <button onClick={() => updateState({ attackCount: gameState.attackCount + 1 })} className="p-1 bg-slate-800 rounded hover:bg-slate-700"><Plus size={14} /></button>
                                 </div>
-                                <button type="button" data-testid="attack-undo" disabled={gameState.attackHistory.length === 0} onClick={handleAttackUndo} className="w-full text-xs text-yellow-300 bg-yellow-800/30 rounded">{t.undo_attack}</button>
                                 <button onClick={() => updateState({ attackCount: 0 })} className="w-full mt-1 text-[10px] text-red-400 bg-red-900/20 py-0.5 rounded">{t.reset}</button>
                             </div>
                         )}
                     </div>
                     <button type="button" className="guard-toggle" data-testid="guard-toggle" aria-label={t.guard_circle} aria-expanded={showGuard} aria-controls="guard-circle-area" onClick={() => togglePanel('guard')}><Shield size={17} /><ChevronDown size={12} className={showGuard ? 'is-open' : ''} /></button>
-                    <div className="relative"><button aria-label={t.settings} data-testid="settings-toggle" onClick={() => togglePanel('tools')} className={`p-2 rounded transition-colors ${showTools ? 'text-cyan-400 bg-cyan-950' : 'text-slate-400'}`}><Settings2 size={18} /></button></div>
+                    <div className="relative header-settings"><button aria-label={t.settings} data-testid="settings-toggle" onClick={() => togglePanel('tools')} className={`p-2 rounded transition-colors ${showTools ? 'text-cyan-400 bg-cyan-950' : 'text-slate-400'}`}><Settings2 size={18} /></button></div>
                 </div>
             </header>
             <button type="button" className="edge-handle edge-left" data-testid="turn-toggle" aria-label={t.turn_controls} aria-expanded={showTopControls} aria-controls="top-controls" onClick={() => togglePanel('turn')}><RefreshCcw size={14} /><span>{language === 'zh' ? '回合' : language === 'ja' ? 'ターン' : 'Turn'}</span></button>
+            <button type="button" className="edge-handle edge-right" data-testid="settings-edge" aria-label={t.settings} aria-expanded={showTools} onClick={() => togglePanel('tools')}><Settings2 size={14} /><span>{t.settings}</span></button>
+            {showTopControls && renderTurnPanel()}
             {storageWarning && <p role="status" className="p-3 text-amber-300">本地保存失败，当前操作仍可继续；请保持页面打开。</p>}
             {showTools && (
-                <div className="drawer-backdrop" onClick={() => setShowTools(false)}><div role="dialog" aria-modal="true" aria-label={t.settings} onClick={e => e.stopPropagation()} className="tools-panel mx-4 mt-2 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-2xl mb-4">
+                <div className="drawer-backdrop tools-backdrop" onClick={() => setShowTools(false)}><div role={wideScreen ? 'region' : 'dialog'} aria-modal={wideScreen ? undefined : true} aria-label={t.settings} onClick={e => e.stopPropagation()} className="tools-panel mx-4 mt-2 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-2xl mb-4">
                     <div className="tools-heading flex justify-between items-center"><span className="text-sm text-slate-300">{t.settings}</span><button aria-label={t.close} onClick={() => setShowTools(false)} className="p-2"><X size={20} /></button></div>
                     <div className="border-b border-slate-800 pb-2 mb-3">
                         <div className="flex justify-between text-[10px] text-cyan-500 mb-2 uppercase tracking-wider items-center"><Globe size={12} className="mr-1" />{t.language}</div>
@@ -1297,7 +1420,7 @@ export default function App() {
                         <button type="button" className="counter-add text-slate-400" onClick={() => updateState({ extraCounters: [...stateRef.current.extraCounters, { name: '', value: 0 }] })}>{t.add_counter}</button>
                     </div>
                     <label className="pg-settings">{t.pg_remaining}<input data-testid="pg-remaining" type="number" min="0" value={gameState.resources.sentinelsRemaining} onChange={e => updateState({ resources: { ...stateRef.current.resources, sentinelsRemaining: Math.max(0, Math.trunc(finite(e.target.value))) } })} /></label>
-                    <details className="grade-settings border-t border-slate-800 pt-2 mt-3">
+                    <details className="grade-settings border-t border-slate-800 pt-2 mt-3" inert={gameState.pendingTrigger || gameState.isMultiSupportMode ? true : undefined}>
                         <summary className="text-xs text-slate-400">{t.grade_presets}</summary>
                         <div className="grid grid-cols-4 gap-1.5 mb-3 bg-slate-950 p-2 rounded">
                             {GRADE_PRESETS.map((preset, idx) => (
@@ -1313,9 +1436,9 @@ export default function App() {
                                                 newPresets[idx] = val;
                                                 // Update global state
                                                 const newUnits = cloneUnits(stateRef.current.units);
-                                                if (newUnits.front_center && newUnits.front_center.basePower === GRADE_PRESETS[idx]) {
-                                                    newUnits.front_center = { ...newUnits.front_center, basePower: val };
-                                                }
+                                                Object.entries(newUnits).forEach(([slot, unit]) => {
+                                                    if (unit.grade === idx && unit.basePower === GRADE_PRESETS[idx] && (idx > 0 || slot === 'front_center')) newUnits[slot] = { ...unit, basePower: val };
+                                                });
                                                 updateState({ units: newUnits });
                                                 GRADE_PRESETS.splice(0, GRADE_PRESETS.length, ...newPresets);
                                                 updateState({ gradePresets: newPresets });
@@ -1334,9 +1457,9 @@ export default function App() {
                 </div></div>
             )}
             <main className="battle-main p-3 max-w-md mx-auto space-y-4">
-                {showTopControls && renderTurnPanel()}
                 {showGuard && <section id="guard-circle-area">{renderGuardCircle()}</section>}
                 <section>
+                    {gameState.isMultiSupportMode && <div className="support-choice" role="status"><span>{actionCopy.choose_support} · {gameState.supportSlots.length}</span><button type="button" data-testid="support-cancel" aria-label={actionCopy.cancel_support} onClick={cancelFreeSupport}><X size={14} /></button></div>}
                     <div className="battle-board grid grid-cols-3 gap-2">
                         {columns.map(column => renderUnitSlot(`front_${column}`, column === 'center' ? t.vanguard : column === 'left' ? t.front_l : t.front_r))}
                         {hasBackRowAttack && columns.map(column => <ColumnAttackButton key={`front-attack-${column}`} frontId={`front_${column}`} backId={`back_${column}`} attackerId={`front_${column}`} compact />)}
