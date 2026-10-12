@@ -634,14 +634,14 @@ export default function App() {
             if (event.key === 'Escape') { setSelectedSlot(null); setShowTools(false); setShowTopControls(false); setShowGuard(false); setShowAttackAdjust(false); }
             if (event.key === 'Tab') {
                 const dialog = document.querySelector(selectedSlot ? '.unit-drawer' : showTools ? '.tools-panel' : showTopControls ? '.turn-panel' : '.guard-panel');
-                const controls = [...(dialog?.querySelectorAll('button:not([disabled]), input, select') || [])];
+                const controls = [...(dialog?.querySelectorAll('button:not([disabled]), input, select, summary') || [])].filter(control => !control.closest('details:not([open])') || control.tagName === 'SUMMARY');
                 const first = controls[0], last = controls[controls.length - 1];
                 if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
                 else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
             }
         };
         const previousFocus = document.activeElement;
-        document.querySelector(selectedSlot ? '.unit-drawer button[data-testid="unit-close" aria-label={t.close}]' : showTools ? '.tools-panel button' : showTopControls ? '.turn-panel button' : '.guard-panel button')?.focus();
+        document.querySelector(selectedSlot ? '.unit-drawer button[data-testid="unit-close"]' : showTools ? '.tools-panel button' : showTopControls ? '.turn-panel button' : '.guard-panel button')?.focus();
         document.addEventListener('keydown', close);
         return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', close); previousFocus?.focus(); };
     }, [selectedSlot, showTools, showTopControls, showGuard]);
@@ -1422,7 +1422,7 @@ export default function App() {
                                     <label className="drawer-grade" htmlFor="unit-grade"><span>G</span><select id="unit-grade" aria-label={t.edit_grade} value={gameState.units[selectedSlot].grade} onChange={e => setUnitGrade(selectedSlot, e.target.value)}>
                                         {[...new Set([0, 1, 2, 3, 4, ...GRADE_PRESETS.map((_, index) => index), gameState.units[selectedSlot].grade])].map(grade => <option key={grade} value={grade}>{grade}</option>)}
                                     </select></label>
-                                    <button type="button" aria-label="Close unit" onClick={() => setSelectedSlot(null)} className="drawer-close bg-slate-800 rounded-full text-slate-400 hover:bg-slate-700"><X size={18} /></button>
+                                    <button type="button" data-testid="unit-close" aria-label={t.close} onClick={() => setSelectedSlot(null)} className="drawer-close bg-slate-800 rounded-full text-slate-400 hover:bg-slate-700"><X size={18} /></button>
                                 </div>
                                 <div className="drawer-summary">
                                     <div className="drawer-number-stack">
