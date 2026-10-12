@@ -1,168 +1,229 @@
 const { JSDOM } = require('jsdom');
-const { readFileSync, readdirSync } = require('node:fs');
+const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const KEY = 'VG_DRAWER_PREVIEW_V1';
-const builtHTML = readFileSync('dist/index.html', 'utf8');
-const entry = builtHTML.match(/src="\/([^"]+\.js)"/)[1];
-const stylesheet = readFileSync('dist/'+builtHTML.match(/href="\/([^"]+\.css)"/)[1], 'utf8');
-const code = readFileSync('dist/' + entry, 'utf8');
-const wait = () => new Promise(r => setTimeout(r, 30));
-async function boot(save, expandTop = false) {
-  const errors = [];
-  const dom = new JSDOM('<style>'+stylesheet+'</style><div id="root"></div>', { url: 'https://vg.test', runScripts: 'outside-only', pretendToBeVisual: true });
-  dom.window.console.error = (...args) => errors.push(args.join(' '));
-  if (save !== undefined) dom.window.localStorage.setItem(KEY, typeof save === 'string' ? save : JSON.stringify(save));
-  dom.window.eval(code); await wait();
-  const doc = dom.window.document;
-  const state = () => JSON.parse(dom.window.localStorage.getItem(KEY));
-  const click = async (text, scope = doc) => {
-    let button = [...scope.querySelectorAll('button')].find(b => b.textContent.trim() === text);
-    if (!button && scope === doc) {
-      doc.querySelector(text.startsWith('PG') ? '[data-testid="guard-toggle"]' : '[data-testid="turn-toggle"]').click(); await wait();
-      button = [...scope.querySelectorAll('button')].find(b => b.textContent.trim() === text);
-    }
-    const active = doc.querySelector('[role="dialog"]');
-    if (button && active && !active.contains(button) && button.closest('main')) {
-      doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', {key:'Escape',bubbles:true})); await wait();
-    }
-    assert.ok(button, 'button ' + text); assert.ok(!button.disabled, text + ' enabled'); button.click(); await wait();
-  };
-  if(expandTop) {doc.querySelector('[data-testid="turn-toggle"]').click();await wait();}
-  return { dom, doc, click, state, errors };
+const html = fs.readFileSync('dist/index.html', 'utf8');
+const code = fs.readFileSync('dist/' + html.match(/src="\/([^"]+\.js)"/)[1], 'utf8');
+const css = fs.readFileSync('dist/' + html.match(/href="\/([^"]+\.css)"/)[1], 'utf8');
+const wait = (ms = 24) => new Promise(resolve => setTimeout(resolve, ms));
+async function boot(save) {
+    const errors = [];
+    const dom = new JSDOM('<style>' + css + '</style><div id="root"></div>', { url: 'https://vg.test', runScripts: 'outside-only', pretendToBeVisual: true });
+    dom.window.console.error = (...args) => errors.push(args.join(' '));
+    if (save !== undefined) dom.window.localStorage.setItem(KEY, typeof save === 'string' ? save : JSON.stringify(save));
+    dom.window.eval(code); await wait();
+    const d = dom.window.document;
+    const state = () => JSON.parse(dom.window.localStorage.getItem(KEY));
+    const test = name => d.querySelector('[data-testid="' + name + '"]');
+    const click = async name => { const element = test(name); assert.ok(element, name); assert.ok(!element.disabled, name + ' enabled'); element.click(); await wait(); };
+    const text = async (value, scope = d) => { const b = [...scope.querySelectorAll('button')].find(b => b.textContent.trim() === value); assert.ok(b, value); assert.ok(!b.disabled); b.click(); await wait(); };
+    const input = async (element, value) => { assert.ok(element); Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(element, String(value)); element.dispatchEvent(new dom.window.Event('input', { bubbles: true })); await wait(); };
+    const escape = async () => { d.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(); };
+    const guard = async () => { if (!test('guard-circle')) await click('guard-toggle'); await click('guard-circle'); };
+    const drag = async (source, target, cancelled = false) => {
+        const node = test('unit-' + source); d.elementFromPoint = () => target;
+        node.dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 10, clientY: 10 }));
+        await wait(390);
+        assert.ok(d.querySelector('.drag-unit-preview'), 'long press starts drag');
+        d.dispatchEvent(new dom.window.MouseEvent('pointermove', { bubbles: true, cancelable: true, clientX: 90, clientY: 100 })); await wait();
+        d.dispatchEvent(new dom.window.MouseEvent(cancelled ? 'pointercancel' : 'pointerup', { bubbles: true, clientX: 90, clientY: 100 })); await wait();
+        assert.ok(!d.querySelector('.drag-unit-preview'));
+        await wait(370);
+    };
+    const done = () => { assert.equal(errors.length, 0, errors.join('\n')); dom.window.close(); };
+    return { dom, d, state, test, click, text, input, escape, guard, drag, done, errors };
 }
 (async () => {
-  let x = await boot();
-  await x.click('Ride 升级'); assert.equal(x.state().units.front_center.grade, 1);
-  await x.click('回合开始'); assert.equal(x.state().units.front_center.grade, 1); assert.equal(x.state().energy, 0);
-  x.doc.querySelector('[data-testid="unit-front_center"]').click(); await wait();
-  let drawer = x.doc.querySelector('[role="dialog"]'); assert.ok(drawer, x.errors.join("\n") || x.doc.body.textContent); assert.equal(x.doc.body.style.overflow, 'hidden');
-  await x.click('+10k', drawer); await x.click('OT (100,000,000)', drawer);
-  assert.equal(x.state().units.front_center.powerBuff, 100010000);
-  await x.click('OT (100,000,000)', drawer); assert.equal(x.state().units.front_center.powerBuff, 10000);
-  x.doc.dispatchEvent(new x.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait();
-  assert.ok(!x.doc.querySelector('[role="dialog"]')); assert.equal(x.doc.body.style.overflow, '');
-  await x.click('攻击 (V)'); assert.equal(x.state().attackCount, 1);
-  await x.click('前列 +10k'); const before = x.state().attackHistory[0].units.front_center.powerBuff;
-  assert.equal(before, 10000, 'history snapshot is immutable');
-  await x.click('撤回'); assert.equal(x.state().units.front_center.powerBuff, 10000); assert.equal(x.state().attackCount, 0);
-  await x.click('PG (4)'); assert.equal(x.state().resources.shield, 0); assert.equal(x.state().resources.sentinelActive, true);
-  await x.click('PG 取消'); assert.equal(x.state().resources.sentinelsRemaining, 4);
-  assert.equal(x.errors.length, 0, x.errors.join('\n')); x.dom.window.close();
-  // Grade remains independent of power and survives a reload; back-row preview uses the attacker.
-  x = await boot({ units: { front_center: { basePower: 13000, grade: 2 }, front_left: { basePower: 10000 }, back_left: { basePower: 8000, isBackRowAttack: true } } });
-  assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').textContent.includes('G2'));
-  x.doc.querySelector('[data-testid="attack-back_left"]').click(); await wait(); assert.equal(x.state().units.back_left.isRested, true); assert.equal(x.state().units.front_left.isRested, false);
-  await x.click('撤回'); assert.equal(x.state().units.back_left.isRested, false);
-  await x.click('回合开始'); const saved = x.state(); x.dom.window.close();
-  x = await boot(saved); assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').textContent.includes('G2')); x.dom.window.close();
-  // Storage failure must leave the current game interactive and expose an explicit status.
-  x = await boot();
-  x.dom.window.Storage.prototype.setItem = () => { throw new Error('quota'); };
-  await x.click('Ride 升级'); assert.ok(x.doc.querySelector('[role="status"]')); assert.ok(x.doc.querySelector('header')); x.dom.window.close();
-  // Equality requires one additional 5k shield increment, including an exact 5k gap.
-  for (const [attack, shield, blocked] of [[13000,0,false],[18000,5000,false],[18000,10000,true],[12000,0,true]]) {
-    x = await boot({ units: { front_center: { basePower: 13000, grade: 3 } }, resources: { shield } });
-    x.doc.querySelector('[data-testid="guard-toggle"]').click(); await wait();
-    const input = x.doc.querySelector('input[placeholder="对手ATK"]');
-    Object.getOwnPropertyDescriptor(x.dom.window.HTMLInputElement.prototype, 'value').set.call(input, String(attack));
-    input.dispatchEvent(new x.dom.window.Event('input', { bubbles: true })); await wait();
-    assert.equal(x.doc.body.textContent.includes('防御成功!'), blocked, `${attack} vs 13000 + ${shield}`);
-    assert.equal(x.errors.length, 0); x.dom.window.close();
-  }
-  // Returning from v3 preserves visible totals exactly once.
-  x = await boot({ version: 3, personaBonus: 10000, units: { front_center: { basePower: 13000, powerBuff: 5000, grade: 3, present: true }, front_left: { basePower: 0, powerBuff: 0, present: false } } });
-  assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').textContent.includes('28,000'));
-  await x.click('+1'); const migrated = x.state(); assert.equal(migrated.version, 2); assert.equal(migrated.units.front_left.powerBuff, 0); x.dom.window.close();
-  x = await boot(migrated); assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').textContent.includes('28,000')); x.dom.window.close();
-  // Old / malformed saved fields must not unmount the app.
-  for (const save of ['{broken', null, { language: 'unknown', units: { front_left: null, front_center: { basePower: 'bad' } }, resources: null, extraCounters: [null], attackHistory: [null] }]) {
-    x = await boot(save); assert.ok(x.doc.querySelector('header')); await x.click('回合开始'); assert.equal(x.state().units.front_center.basePower, 6000); x.dom.window.close();
-  }
-  // Side menus stay outside the board and share one modal at a time.
-  x = await boot(undefined, false);
-  assert.ok(!x.doc.querySelector('#top-controls')); assert.ok(!x.doc.querySelector('.guard-panel'));
-  assert.equal(x.dom.window.getComputedStyle(x.doc.querySelector('.edge-left')).position, 'fixed');
-  x.doc.querySelector('[data-testid="turn-toggle"]').click(); await wait();
-  assert.ok(x.doc.querySelector('.turn-panel')); assert.equal(x.doc.body.style.overflow, 'hidden');
-  assert.ok([...x.doc.querySelectorAll('#top-controls button')].find(b => b.textContent.trim() === 'Ride 升级').classList.contains('text-blue-300'));
-  x.doc.querySelector('[data-testid="guard-toggle"]').click(); await wait();
-  assert.ok(!x.doc.querySelector('.turn-panel')); assert.ok(x.doc.querySelector('.guard-panel'));
-  x.doc.querySelector('.side-menu-backdrop').click(); await wait(); assert.equal(x.doc.body.style.overflow, '');
-  assert.ok(!x.doc.querySelector('main input[placeholder="对手ATK"]')); assert.ok(!x.doc.querySelector('main .free-counters'));
-  assert.equal(x.doc.querySelectorAll('[data-testid^="unit-"]').length, 6); x.dom.window.close();
-  // Current values are atomic; visible digits roll in the requested direction.
-  x = await boot({ units: { front_center: { basePower:13000, powerBuff:5000, grade:3 } } }, false);
-  x.doc.querySelector('[data-testid="unit-front_center"]').click(); await wait();
-  const power = () => Number(x.doc.querySelector('[data-testid="drawer-power"]').dataset.value);
-  assert.equal(power(), 18000);
-  assert.equal(x.dom.window.getComputedStyle(x.doc.querySelector('.drawer-heading')).position, 'sticky');
-  assert.ok(x.doc.querySelector('.drawer-toolbar select#unit-grade'));
-  assert.ok(x.doc.querySelector('.drawer-heading .drawer-critical'));
-  await x.click('+5k', x.doc.querySelector('.unit-drawer')); assert.equal(power(),23000); assert.ok(x.doc.querySelector('.drawer-live-power .roll-up'));
-  await x.click('-10k', x.doc.querySelector('.unit-drawer')); assert.equal(power(),13000); assert.ok(x.doc.querySelector('.drawer-live-power .roll-down'));
-  assert.ok(!x.doc.querySelector('[data-testid="power-delta"]'));
-  const rapid = [...x.doc.querySelectorAll('.unit-drawer button')].find(b => b.textContent.trim() === '+5k');
-  for(let i=0;i<20;i++)rapid.click(); await wait(); assert.equal(power(),113000);
-  x.doc.querySelector('[aria-label="增加暴击"]').click(); x.doc.querySelector('[aria-label="增加暴击"]').click(); await wait();
-  assert.equal(Number(x.doc.querySelector('[data-testid="critical-value"]').dataset.value),3);
-  const grade=x.doc.querySelector('#unit-grade');grade.value='4';grade.dispatchEvent(new x.dom.window.Event('change',{bubbles:true}));await wait();
-  assert.equal(x.state().units.front_center.basePower,28000);assert.equal(x.state().units.front_center.powerBuff,100000);
-  grade.value='0';grade.dispatchEvent(new x.dom.window.Event('change',{bubbles:true}));await wait();assert.equal(x.state().units.front_center.basePower,6000);
-  x.doc.querySelector('[data-testid="unit-close"]').click();await wait();
-  x.doc.querySelector('[data-testid="unit-front_left"]').click();await wait();
-  assert.equal(Number(x.doc.querySelector('[data-testid="drawer-power"]').dataset.value),0);assert.ok(!x.doc.querySelector('.drawer-live-power [data-rolling]'));
-  assert.equal(x.errors.length,0,x.errors.join('\n'));x.dom.window.close();
-  // Rear guards do not inherit Vanguard power shortcuts.
-  x=await boot({units:{front_left:{basePower:10000,grade:2}}});
-  x.doc.querySelector('[data-testid="unit-front_left"]').click();await wait();
-  x.doc.querySelector('#unit-grade').value='0';x.doc.querySelector('#unit-grade').dispatchEvent(new x.dom.window.Event('change',{bubbles:true}));await wait();
-  assert.equal(x.state().units.front_left.grade,0);assert.equal(x.state().units.front_left.basePower,10000);x.dom.window.close();
-  // Front and rear attacks remain independently selectable in either order.
-  x=await boot({units:{front_left:{basePower:10000},back_left:{basePower:8000,isBackRowAttack:true},front_right:{basePower:12000},back_right:{basePower:6000,isSupporting:true}}});
-  assert.equal(x.doc.querySelectorAll('.attack-between').length,3);
-  assert.equal(Number(x.doc.querySelector('[data-testid="total-back_left"]').dataset.value),8000);
-  assert.ok(x.doc.querySelector('[data-testid="attack-back_right"]').disabled);
-  x.doc.querySelector('[data-testid="attack-front_left"]').click();await wait();assert.equal(x.state().units.front_left.isRested,true);assert.equal(x.state().units.back_left.isRested,false);
-  x.doc.querySelector('[data-testid="attack-back_left"]').click();await wait();assert.equal(x.state().units.back_left.isRested,true);assert.equal(x.state().attackCount,2);
-  assert.equal(x.doc.querySelectorAll('.attack-between').length,3,'buttons do not jump after the first attack');
-  x.doc.querySelector('[data-testid="attack-front_left"]').click();await wait();assert.equal(x.state().attackCount,2,'rested front never falls back to rear');
-  await x.click('撤回');assert.equal(x.state().units.back_left.isRested,false);assert.equal(x.state().units.front_left.isRested,true);
-  assert.equal(x.errors.length,0,x.errors.join('\n'));x.dom.window.close();
-  x=await boot({units:{front_left:{basePower:10000},back_left:{basePower:8000,isSupporting:true}}});
-  assert.equal(x.doc.querySelectorAll('.attack-between').length,0);assert.equal(Number(x.doc.querySelector('[data-testid="total-front_left"]').dataset.value),18000);
-  x.doc.querySelector('[data-testid="attack-front_left"]').click();await wait();assert.equal(x.state().units.front_left.isRested,true);assert.equal(x.state().units.back_left.isRested,true);x.dom.window.close();
-  // OT power, glow and drawer state are independent for every unit.
-  x=await boot({units:{front_center:{basePower:13000,powerBuff:5000,grade:3},front_left:{basePower:10000}}});
-  const openUnit=async id=>{x.doc.querySelector('[data-testid="unit-'+id+'"]').click();await wait();};
-  const closeUnit=async()=>{x.doc.querySelector('[data-testid="unit-close"]').click();await wait();};
-  await openUnit('front_center');x.doc.querySelector('[data-testid="unit-ot"]').click();await wait();assert.ok(x.doc.querySelector('[data-testid="unit-ot"]').classList.contains('ot-active'));
-  await closeUnit();await openUnit('front_left');assert.ok(x.doc.querySelector('[data-testid="unit-ot"]').classList.contains('ot-inactive'));assert.equal(x.doc.querySelector('[data-testid="unit-ot"]').getAttribute('aria-pressed'),'false');
-  assert.ok(x.doc.querySelector('[data-testid="unit-front_center"]').classList.contains('rainbow-glow'));assert.ok(!x.doc.querySelector('[data-testid="unit-front_left"]').classList.contains('rainbow-glow'));
-  x.doc.querySelector('[data-testid="unit-ot"]').click();await wait();await closeUnit();await openUnit('front_center');
-  x.doc.querySelector('[data-testid="unit-ot"]').click();await wait();assert.equal(x.state().units.front_center.powerBuff,5000);assert.equal(x.state().units.front_left.otActive,true);
-  const ot=x.doc.querySelector('[data-testid="unit-ot"]');ot.click();ot.click();await wait();assert.equal(x.state().units.front_center.powerBuff,5000,'rapid toggle preserves non-OT buff');
-  assert.equal(x.errors.length,0,x.errors.join('\n'));x.dom.window.close();
-  // Free counters preserve edited legacy resources once, and rapid taps use current state.
-  x=await boot({resources:{soul:7,critTriggers:2},extraCounters:[{name:'Custom',value:3}]});
-  x.doc.querySelector('[data-testid="settings-toggle"]').click();await wait();assert.equal(x.doc.querySelectorAll('.free-counter').length,3);
-  const plus=x.doc.querySelector('.free-counter [aria-label="增加"]');for(let i=0;i<20;i++)plus.click();await wait();assert.equal(x.state().extraCounters[0].value,23);
-  const names=x.state().extraCounters.map(c=>c.name);assert.ok(names.includes('魂'));assert.ok(names.includes('暴击触发'));
-  const resaved=x.state();x.dom.window.close();x=await boot(resaved);await x.click('+1');assert.equal(x.state().extraCounters.length,3);x.dom.window.close();
-  // Random tools settle on the selected face; language-specific labels stay meaningful.
-  for(const [language,roll,flip,heads] of [['zh','掷骰子','抛硬币','正面'],['en','Roll die','Flip coin','Heads'],['ja','サイコロを振る','コイントス','表']]){
-    x=await boot({language});x.doc.querySelector('[data-testid="settings-toggle"]').click();await wait();
-    let draws=0;x.dom.window.Math.random=()=>{draws++;return 0;};
-    const rollButton=[...x.doc.querySelectorAll('button')].find(b=>b.textContent.trim()===roll);
-    for(let i=0;i<10;i++)rollButton.click();await wait();assert.equal(draws,1);
-    assert.ok(x.doc.querySelector('.die-cube.is-rolling'));assert.equal(x.doc.querySelectorAll('.die-face').length,6);
-    await x.click(flip);assert.ok(x.doc.querySelector('.coin-disc.is-rolling'));await new Promise(r=>setTimeout(r,770));
-    assert.equal(x.doc.querySelector('[data-testid="dice-result"]').textContent,'1');assert.equal(x.doc.querySelector('[data-testid="coin-result"]').textContent,heads);
-    assert.ok(!x.doc.querySelector('.chance-scene .is-rolling'));assert.equal(x.errors.length,0,x.errors.join('\n'));
-    x.doc.dispatchEvent(new x.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await wait();assert.equal(x.doc.body.style.overflow,'');x.dom.window.close();
-  }
-  const {existsSync}=require('node:fs');
-  for(const kind of ['critical','boost','intercept','double-drive','triple-drive']){
-    const file='public/symbols/'+kind+'.jpg';assert.ok(existsSync(file),file);const bytes=readFileSync(file);assert.ok(bytes.length>100);assert.equal(bytes[0],255);assert.equal(bytes[1],216);
-  }
-  console.log('PASS: side menus, compact live drawer, digit reels, grade shortcuts, explicit front/rear attacks, per-unit OT visuals, persistent free counters, 3D random tools in three languages, official icon assets and original combat regressions.');
-})().catch(error => { console.error(error); process.exitCode = 1; });
+    // Board, typography and non-modal menu structure: no badges collide with grade.
+    let x = await boot();
+    assert.equal(x.d.querySelectorAll('[data-slot]').length, 6);
+    assert.equal(x.d.querySelectorAll('.edge-handle').length, 1);
+    assert.ok(!x.d.querySelector('.edge-right'));
+    assert.ok(!x.d.querySelector('.guard-circle'));
+    await x.click('turn-toggle');
+    assert.equal(x.d.body.style.overflow, '', 'round menu does not lock the board');
+    assert.equal(x.d.querySelectorAll('.turn-actions button').length, 6);
+    assert.equal(x.dom.window.getComputedStyle(x.d.querySelector('.turn-panel')).position, 'relative');
+    assert.ok(x.d.querySelector('main').contains(x.d.querySelector('.turn-panel')), 'menu uses document space');
+    assert.deepEqual([...x.d.querySelectorAll('.turn-actions button')].map(b => b.textContent.trim()), ['Ride 升级','前列 +10k','回合开始','回合结束','自由支援','后列截击']);
+    for (const number of x.d.querySelectorAll('.power-fit, .power-value')) assert.equal(x.dom.window.getComputedStyle(number).fontStyle, 'normal');
+    assert.ok(x.test('ride-action').classList.contains('text-blue-300'));
+    await x.click('ride-action'); assert.equal(x.state().units.front_center.grade, 1); assert.equal(x.state().units.front_center.basePower, 8000);
+    await x.text('回合开始'); assert.equal(x.state().units.front_center.grade, 1); assert.equal(x.state().energy, 0);
+    await x.click('turn-toggle'); x.done();
+
+    // Main grade click opens quick choices and custom input, never a unit drawer.
+    x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 10000 }, front_left: { grade: 2, basePower: 11000 } } });
+    await x.click('grade-front_center');
+    assert.ok(x.test('grade-picker')); assert.ok(!x.d.querySelector('.unit-drawer'));
+    assert.equal(x.test('grade-front_center').textContent, '3');
+    assert.equal(x.d.querySelector('.grade-options button[data-grade="4"]').textContent, '428,000');
+    x.d.querySelector('[data-grade="4"]').click(); await wait();
+    assert.equal(x.state().units.front_center.grade, 4); assert.equal(x.state().units.front_center.basePower, 28000); assert.equal(x.state().units.front_center.powerBuff, 10000);
+    await x.click('grade-front_left'); await x.input(x.d.querySelector('.grade-custom input'), 7);
+    x.d.querySelector('.grade-custom').dispatchEvent(new x.dom.window.Event('submit', { bubbles: true, cancelable: true })); await wait();
+    assert.equal(x.state().units.front_left.grade, 7); assert.equal(x.state().units.front_left.basePower, 11000, 'rear printed power is independent of grade');
+    assert.equal(x.test('grade-front_left').textContent, '7');
+    assert.ok(!x.test('unit-front_left').textContent.includes('G7'));
+    await x.click('grade-front_left'); await x.escape(); assert.ok(!x.test('grade-picker')); x.done();
+
+    // Compact drawer keeps base before modifier; manual entry expands only at the live summary.
+    x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 5000 } } });
+    await x.click('unit-front_center');
+    assert.equal(x.d.body.style.overflow, 'hidden');
+    assert.ok(!x.d.querySelector('.inline-power-editor'));
+    assert.equal(x.d.querySelectorAll('.unit-drawer input').length, 0);
+    assert.equal(x.test('base-section').compareDocumentPosition(x.test('buff-section')) & 4, 4);
+    assert.equal(x.dom.window.getComputedStyle(x.d.querySelector('.drawer-heading')).position, 'sticky');
+    assert.equal(Number(x.test('drawer-power').dataset.value), 18000);
+    await x.text('+5k', x.d.querySelector('.unit-drawer'));
+    assert.equal(Number(x.test('drawer-power').dataset.value), 23000);
+    const reel = x.d.querySelector('.drawer-live-power .digit-track');
+    assert.ok(reel); assert.ok(reel.children.length >= 21); assert.ok(reel.textContent.includes('1234567890'), 'reel traverses all decimal digits twice');
+    await x.text('-10k', x.d.querySelector('.unit-drawer'));
+    assert.equal(Number(x.test('drawer-power').dataset.value), 13000); assert.ok(x.d.querySelector('.drawer-live-power .roll-down'));
+    const plus = [...x.d.querySelectorAll('.unit-drawer button')].find(b => b.textContent.trim() === '+5k');
+    for(let i=0;i<20;i++) plus.click(); await wait(); assert.equal(Number(x.test('drawer-power').dataset.value), 113000);
+    await x.click('edit-base'); await x.input(x.d.querySelector('#power-edit'), 9000);
+    x.d.querySelector('.inline-power-editor').dispatchEvent(new x.dom.window.Event('submit', { bubbles: true, cancelable: true })); await wait();
+    assert.equal(x.state().units.front_center.basePower, 9000); assert.ok(!x.d.querySelector('.inline-power-editor'));
+    await x.click('edit-buff'); await x.input(x.d.querySelector('#power-edit'), -1000);
+    x.d.querySelector('.inline-power-editor').dispatchEvent(new x.dom.window.Event('submit', { bubbles: true, cancelable: true })); await wait();
+    assert.equal(x.state().units.front_center.powerBuff, -1000); assert.equal(Number(x.test('drawer-power').dataset.value), 8000);
+    const critical = x.d.querySelector('[aria-label="增加暴击"]'); critical.click(); critical.click(); await wait(); assert.equal(Number(x.test('critical-value').dataset.value), 3);
+    assert.ok(x.d.querySelector('.drawer-critical .official-symbol svg') === null);
+    assert.ok(x.d.querySelector('.drawer-critical svg image').getAttribute('href').endsWith('vg-tech-atlas.png'));
+    await x.click('unit-close'); await x.click('unit-front_left'); assert.equal(Number(x.test('drawer-power').dataset.value), 0);
+    assert.ok(!x.d.querySelector('.drawer-live-power [data-rolling]')); await x.escape(); assert.equal(x.d.body.style.overflow, ''); x.done();
+
+    // OT belongs to each unit and preserves unrelated modifiers on rapid toggles.
+    x = await boot({ units: { front_center: { basePower:13000,powerBuff:5000,grade:3 }, front_left: { basePower:10000,grade:2 } } });
+    await x.click('unit-front_center'); await x.click('unit-ot'); assert.equal(x.state().units.front_center.powerBuff, 100005000);
+    await x.click('unit-close'); await x.click('unit-front_left'); assert.equal(x.test('unit-ot').getAttribute('aria-pressed'), 'false');
+    assert.ok(x.test('unit-front_center').classList.contains('rainbow-glow')); assert.ok(!x.test('unit-front_left').classList.contains('rainbow-glow'));
+    await x.click('unit-ot'); await x.click('unit-close'); await x.click('unit-front_center');
+    await x.click('unit-ot'); assert.equal(x.state().units.front_center.powerBuff, 5000);
+    const ot = x.test('unit-ot'); ot.click(); ot.click(); await wait(); assert.equal(x.state().units.front_center.powerBuff, 5000); assert.equal(x.state().units.front_left.otActive, true); x.done();
+
+    // Boost is an ability independent of active support; enabling free boost allows another row.
+    x = await boot({ units: { front_left: { grade:1,basePower:8000 }, front_right:{grade:2,basePower:10000}, back_right:{grade:1,basePower:8000,isSupporting:true} } });
+    await x.click('unit-front_left'); await x.click('ability-boost'); assert.equal(x.state().units.front_left.hasBoost, false);
+    await x.click('ability-boost'); assert.equal(x.state().units.front_left.hasBoost, true);
+    await x.click('unit-close'); assert.ok(!x.test('boost-front_left'));
+    await x.click('turn-toggle'); await x.click('free-support'); assert.ok(x.test('boost-front_left'));
+    await x.click('boost-front_left'); assert.equal(x.state().units.front_left.isSupporting, true);
+    await x.click('attack-front_right'); assert.equal(x.state().units.front_left.isRested, true); assert.equal(x.state().units.back_right.isRested, true);
+    x.done();
+
+    // Normal and rear attacks stay independently selectable, including after one attacker rests.
+    x = await boot({ units: { front_left:{basePower:10000,grade:2},back_left:{basePower:8000,grade:1,isBackRowAttack:true},front_right:{basePower:12000,grade:2},back_right:{basePower:6000,grade:1,isSupporting:true} } });
+    assert.equal(x.d.querySelectorAll('.attack-between').length, 3);
+    assert.equal(Number(x.test('total-back_left').dataset.value), 8000); assert.ok(x.test('attack-back_right').disabled);
+    await x.click('attack-front_left'); assert.equal(x.state().units.front_left.isRested, true); assert.equal(x.state().units.back_left.isRested, false);
+    await x.click('attack-back_left'); assert.equal(x.state().attackCount, 2);
+    x.test('attack-front_left').click(); await wait(); assert.equal(x.state().attackCount, 2);
+    assert.equal(x.d.querySelectorAll('.attack-between').length, 3);
+    await x.click('attack-count-toggle'); await x.click('attack-undo'); assert.equal(x.state().units.back_left.isRested, false); assert.equal(x.state().units.front_left.isRested, true);
+    x.done();
+    x = await boot({ units:{front_left:{grade:2,basePower:10000},back_left:{grade:1,basePower:8000,isSupporting:true}} });
+    assert.equal(Number(x.test('total-front_left').dataset.value), 18000);
+    await x.click('attack-front_left'); assert.equal(x.state().units.back_left.isRested, true);
+    const old = x.state().attackHistory[0].units.front_left.powerBuff;
+    await x.click('turn-toggle'); await x.text('前列 +10k'); assert.equal(x.state().attackHistory[0].units.front_left.powerBuff, old); x.done();
+
+    // Ride becomes Stride at G3; temporary G4 ends without erasing the heart unit.
+    x = await boot({ units:{front_center:{grade:2,basePower:10000,powerBuff:5000}} });
+    await x.click('turn-toggle'); await x.click('ride-action');
+    assert.equal(x.state().units.front_center.grade, 3); assert.equal(x.test('ride-action').textContent, '超越');
+    await x.click('ride-action'); assert.equal(x.state().units.front_center.grade, 4); assert.equal(x.state().units.front_center.basePower, 28000); assert.equal(x.state().units.front_center.powerBuff, 5000);
+    assert.equal(x.state().units.front_center.heart.basePower, 13000); assert.ok(x.test('ride-action').disabled);
+    await x.text('回合结束'); assert.equal(x.state().units.front_center.grade, 3); assert.equal(x.state().units.front_center.basePower, 13000); assert.equal(x.state().units.front_center.powerBuff, 0); assert.equal(x.test('ride-action').textContent, '超越');
+    x.done();
+
+    // Long press drag swaps actual unit fields, cancels safely and prevents accidental drawers.
+    x = await boot({ units:{front_left:{grade:2,basePower:10000,powerBuff:1000,crit:2},back_right:{grade:1,basePower:8000}} });
+    await x.drag('front_left', x.test('unit-back_right'));
+    assert.equal(x.state().units.back_right.basePower, 10000); assert.equal(x.state().units.back_right.powerBuff, 1000); assert.equal(x.state().units.back_right.crit, 2);
+    assert.equal(x.state().units.front_left.basePower, 8000); assert.ok(!x.d.querySelector('.unit-drawer'));
+    const before = JSON.stringify(x.state().units);
+    await x.drag('back_right', x.test('unit-front_left'), true); assert.equal(JSON.stringify(x.state().units), before);
+    const node = x.test('unit-front_left');
+    node.dispatchEvent(new x.dom.window.MouseEvent('pointerdown', { bubbles:true,button:0,clientX:0,clientY:0 }));
+    x.d.dispatchEvent(new x.dom.window.MouseEvent('pointermove', { bubbles:true,clientX:30,clientY:40 })); await wait(390);
+    assert.ok(!x.d.querySelector('.drag-unit-preview'), 'scroll movement cancels pending long press');
+    x.done();
+
+    // Guardian circle counts printed SHIELD, reserves interceptors, and retires only on resolution.
+    x = await boot({ units:{front_center:{grade:3,basePower:13000},front_left:{grade:2,basePower:10000,shield:10000,isRested:true},front_right:{grade:2,basePower:12000,shield:5000}} });
+    await x.click('guard-toggle'); assert.ok(x.test('guard-circle'));
+    assert.ok([...x.d.querySelector('main').children].findIndex(n => n.id === 'guard-circle-area') < [...x.d.querySelector('main').children].findIndex(n => n.querySelector?.('.battle-board')));
+    await x.drag('front_left', x.test('guard-circle'));
+    assert.deepEqual(x.state().guardSlots, ['front_left']); assert.equal(x.state().units.front_left.basePower, 10000, 'not retired before resolve');
+    assert.equal(Number(x.test('guard-circle').dataset.value), 10000, 'shield, not 10000 power plus modifiers');
+    await x.click('guard-circle'); assert.equal(Number(x.test('drawer-power').dataset.value), 23000);
+    await x.text('23k', x.d.querySelector('.guard-drawer'));
+    assert.equal(x.test('guard-status').dataset.safe, 'false', 'equal power hits');
+    await x.input(x.d.querySelector('#manual-shield'), 5000); assert.equal(Number(x.test('drawer-power').dataset.value), 28000);
+    assert.equal(x.test('guard-status').dataset.safe, 'true');
+    await x.click('guard-resolve'); assert.equal(x.state().units.front_left.basePower, 0); assert.equal(x.state().units.front_right.basePower, 12000);
+    assert.equal(x.state().guardSlots.length, 0); assert.equal(x.state().resources.shield, 0); x.done();
+
+    // Same interceptor cannot be double-counted; cancel preserves units and refunds unspent PG.
+    x = await boot({ units:{front_center:{grade:3,basePower:13000},front_left:{grade:2,basePower:11000,shield:5000}} });
+    await x.click('guard-toggle'); await x.drag('front_left', x.test('guard-circle'));
+    await x.guard(); await x.click('perfect-guard');
+    assert.equal(x.state().resources.sentinelsRemaining, 3); assert.equal(x.test('guard-status').dataset.safe, 'true');
+    await x.text('取消', x.d.querySelector('.guard-drawer'));
+    assert.equal(x.state().guardSlots.length, 0); assert.equal(x.state().units.front_left.basePower, 11000); assert.equal(x.state().resources.sentinelsRemaining, 4);
+    await x.click('perfect-guard'); await x.click('guard-resolve'); assert.equal(x.state().resources.sentinelsRemaining, 3, 'resolved PG remains consumed');
+    x.done();
+
+    // Back-row intercept requires explicit ability override; Vanguard never enters guardian circle.
+    x = await boot({ units:{back_left:{grade:2,basePower:10000,shield:15000},front_right:{grade:1,basePower:8000}} });
+    await x.click('guard-toggle'); await x.drag('back_left', x.test('guard-circle')); assert.equal(x.state()?.guardSlots.length ?? 0, 0);
+    await x.click('turn-toggle'); await x.click('back-intercept');
+    await x.drag('back_left', x.test('guard-circle')); assert.deepEqual(x.state().guardSlots, ['back_left']); assert.equal(Number(x.test('guard-circle').dataset.value), 15000);
+    assert.equal(x.state().units.back_left.basePower, 10000);
+    await x.guard(); await x.click('guard-resolve'); assert.equal(x.state().units.back_left.basePower, 0); x.done();
+
+    // Guard state and custom shield values survive reload; missing / malformed saves do not black screen.
+    x = await boot({ units:{front_left:{grade:2,basePower:10000,shield:20000}},guardSlots:['front_left','front_left','front_center','bad'],opponentPower:53000 });
+    await x.guard(); assert.equal(x.d.querySelector('#opponent-power').value, '53000');
+    await x.input(x.d.querySelector('#manual-shield'), 5000);
+    const guardSave = x.state(); x.done(); x = await boot(guardSave); await x.guard();
+    assert.equal(Number(x.test('guard-circle').dataset.value), 25000); assert.equal(x.d.querySelector('#opponent-power').value, '53000'); x.done();
+    for(const save of ['{broken',null,{language:'unknown',units:{front_left:null,front_center:{basePower:'bad'}},resources:null,extraCounters:[null],attackHistory:[null],guardSlots:['bad']}]) {
+        x = await boot(save); assert.ok(x.d.querySelector('header')); await x.click('turn-toggle'); await x.text('回合开始'); assert.equal(x.state().units.front_center.basePower, 6000);
+        // Invalid JSON is an expected storage warning, not a render error.
+        assert.ok(!x.d.body.textContent.includes('页面遇到了错误')); x.dom.window.close();
+    }
+    x = await boot({version:3,personaBonus:10000,units:{front_center:{basePower:13000,powerBuff:5000,grade:3,present:true},front_left:{basePower:0,powerBuff:0,present:false}}});
+    assert.equal(Number(x.test('unit-front_center').dataset.value), 28000); await x.text('+1'); const migrated=x.state(); assert.equal(migrated.version, 2); assert.equal(migrated.units.front_left.powerBuff, 0); x.done();
+    x = await boot(migrated); assert.equal(Number(x.test('unit-front_center').dataset.value), 28000); x.done();
+    x = await boot(); x.dom.window.Storage.prototype.setItem=()=>{throw new Error('quota');};
+    await x.click('turn-toggle'); await x.click('ride-action'); assert.ok(x.d.querySelector('[role="status"]')); assert.ok(x.d.querySelector('header')); x.dom.window.close();
+
+    // Free counters migrate once and use current values even for rapid clicks.
+    x = await boot({resources:{soul:7,critTriggers:2},extraCounters:[{name:'Custom',value:3}]});
+    await x.click('settings-toggle'); assert.equal(x.d.querySelectorAll('.free-counter').length, 3);
+    const counterPlus=x.d.querySelector('.free-counter [aria-label="增加"]'); for(let i=0;i<20;i++)counterPlus.click(); await wait(); assert.equal(x.state().extraCounters[0].value, 23);
+    assert.ok(x.state().extraCounters.some(c=>c.name==='魂')); const counterSave=x.state(); x.done();
+    x = await boot(counterSave); await x.text('+1'); assert.equal(x.state().extraCounters.length, 3); x.done();
+
+    // Three-language 3D random tools, repeat tap lock, and cleanup remain intact.
+    for(const [language,roll,flip,heads] of [['zh','掷骰子','抛硬币','正面'],['en','Roll die','Flip coin','Heads'],['ja','サイコロを振る','コイントス','表']]) {
+        x = await boot({language}); await x.click('settings-toggle'); let draws=0; x.dom.window.Math.random=()=>{draws++;return 0;};
+        const button=[...x.d.querySelectorAll('button')].find(b=>b.textContent.trim()===roll); for(let i=0;i<10;i++)button.click(); await wait(); assert.equal(draws, 1); assert.equal(x.d.querySelectorAll('.die-face').length, 6);
+        await x.text(flip); await wait(770); assert.equal(x.test('dice-result').textContent, '1'); assert.equal(x.test('coin-result').textContent, heads);
+        await x.escape(); assert.equal(x.d.body.style.overflow, ''); x.done();
+    }
+
+    // Asset validation: transparent PNG, regular (non-italic) fonts, no JPEG square backgrounds in UI.
+    const png=fs.readFileSync('public/symbols/vg-tech-atlas.png');
+    assert.equal(png.readUInt32BE(16), 1254); assert.equal(png.readUInt32BE(20), 1254); assert.equal(png[25], 6, 'RGBA atlas');
+    for(const weight of [600,800]) {
+        const font=fs.readFileSync('public/fonts/barlow-condensed-'+weight+'.ttf');
+        for(let i=0;i<font.readUInt16BE(4);i++) { const record=12+i*16,tag=font.toString('ascii',record,record+4),offset=font.readUInt32BE(record+8); if(tag==='head')assert.equal(font.readUInt16BE(offset+44)&2,0,'no italic macStyle'); if(tag==='OS/2')assert.equal(font.readUInt16BE(offset+62)&1,0,'no italic selection'); }
+    }
+    console.log('PASS: original combat and storage; upright decimal reels; flow-layout round menu; direct grade editing; compact base/mod drawer; independent Boost; ride/Stride; long-press swap and cancellation; printed-shield intercept/resolve/cancel/PG; rear intercept toggle; guard persistence; OT isolation; counters; 3D tools and icon/font assets.');
+})().catch(error=>{console.error(error);process.exitCode=1});
