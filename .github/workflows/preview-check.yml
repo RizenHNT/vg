@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
 permissions:
-  contents: write
+  contents: read
 jobs:
   regression:
     runs-on: ubuntu-latest
@@ -22,19 +22,3 @@ jobs:
         with:
           name: vg-mobile-preview
           path: dist/review-preview.html
-      - name: Save isolated review build
-        if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'design/official-playmat-preview'
-        env:
-          REVIEW_BRANCH: ${{ github.event.pull_request.head.ref }}
-          REVIEW_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          test "$REVIEW_BRANCH" = "design/official-playmat-preview"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist public/review-preview.html
-          if ! git diff --cached --quiet; then
-            git commit -m "Build isolated eleven-item UI review [skip ci]"
-            git push origin "HEAD:refs/heads/$REVIEW_BRANCH" --force-with-lease="refs/heads/$REVIEW_BRANCH:$REVIEW_SHA"
-          fi
-          echo "VG_REVIEW_SAVED_SHA=$(git rev-parse HEAD)"
-          echo "VG_REVIEW_SAVED_TREE=$(git rev-parse HEAD^{tree})"
