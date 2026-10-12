@@ -1,6 +1,6 @@
 import './styles.css';
 import './drawer-enhancements.css';
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
 import {
     Sword, Zap, RotateCcw, X, Settings2, Dices, CircleDollarSign, ChevronDown,
     Trash2, Move, Shield, Ghost, AlertTriangle, Layers, Crown, CornerUpLeft, Anchor, Plus, Minus, Globe, Users, ChevronsUp,
@@ -220,7 +220,7 @@ function RollingDigits({ value, resetKey = '' }) {
 function PowerNumber({ value, className = '', maxSize = 34, resetKey = '' }) {
     const box = useRef(null);
     const text = useRef(null);
-    useEffect(() => {
+    useLayoutEffect(() => {
         const fit = () => {
             if (!box.current || !text.current) return;
             const metrics = getComputedStyle(box.current);

@@ -60,7 +60,7 @@ async function boot(save, measuredFit = false) {
     // Width fitting accounts for the actual cell padding, including nine-digit OT totals.
     x = await boot({units:{front_center:{grade:3,basePower:13000,powerBuff:100000000,otActive:true}}}, true);
     const numeral=x.test('unit-front_center').querySelector('.power-value');
-    assert.ok(numeral.getBoundingClientRect().width <= 68, 'numeral respects 80px box minus 10px padding and safety gap');
+    assert.ok(numeral.getBoundingClientRect().width <= 68, 'fitted numeral ' + JSON.stringify({font:numeral.style.fontSize,width:numeral.getBoundingClientRect().width,paddingLeft:x.dom.window.getComputedStyle(numeral.parentElement).paddingLeft,paddingRight:x.dom.window.getComputedStyle(numeral.parentElement).paddingRight}));
     x.done();
 
     // Main grade click opens quick choices and custom input, never a unit drawer.
