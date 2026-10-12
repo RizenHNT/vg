@@ -971,8 +971,6 @@ export default function App() {
         }
     };
 
-    // 是否任意单位处于 OT 状态（用于 OT 按钮发光）
-    const hasAnyOT = Object.values(gameState.units).some(u => (u && u.otActive));
 
     // --- Renderers ---
 
@@ -1468,7 +1466,7 @@ export default function App() {
                             {/* 独立的 OT 按钮 - 炫酷彩色效果 */}
                             <button
                                 onClick={handleOTBuff}
-                                className={`ot-button-style w-full mt-3 py-3 rounded font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-all ${hasAnyOT ? 'ot-active' : 'ot-inactive'}`}
+                                className={`ot-button-style w-full mt-3 py-3 rounded font-black text-sm uppercase tracking-widest active:scale-[0.98] transition-all ${gameState.units[selectedSlot].otActive ? 'ot-active' : 'ot-inactive'}`}
                             >
                                 {t.ot} ({formatNumber(OT_BUFF_VALUE)})
                             </button>
