@@ -1,0 +1,36 @@
+name: Preview checks
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - name: Inspect official card symbols
+        continue-on-error: true
+        run: |
+          node --input-type=module <<'NODE'
+          const pages=['https://cf-vanguard.com/cardlist/?cardno=D-SD01%2F011','https://cf-vanguard.com/howto/first_guide/menu05/','https://en.cf-vanguard.com/cardlist/?cardno=D-SD01%2F011EN'];
+          for(const url of pages){
+            try{
+              const response=await fetch(url,{signal:AbortSignal.timeout(20000)});
+              const html=await response.text();
+              console.log('VG_ICON_PAGE',JSON.stringify({url,status:response.status}));
+              const tags=[...html.matchAll(/<img\b[^>]*>/gi)].map(m=>m[0]);
+              for(const tag of tags){
+                const src=tag.match(/\bsrc=["']([^"']+)["']/i)?.[1];
+                const alt=tag.match(/\balt=["']([^"']*)["']/i)?.[1]||'';
+                if(src&&/critical|power|icon|trigger|クリティカル|トリガー/i.test(src+' '+alt))console.log('VG_ICON_CANDIDATE',JSON.stringify({src:new URL(src,url).href,alt}));
+              }
+            }catch(error){console.log('VG_ICON_FETCH_FAILED',url,error.message);}
+          }
+          NODE
