@@ -223,7 +223,8 @@ function PowerNumber({ value, className = '', maxSize = 34, resetKey = '' }) {
     useEffect(() => {
         const fit = () => {
             if (!box.current || !text.current) return;
-            const available = box.current.clientWidth - 2;
+            const metrics = getComputedStyle(box.current);
+            const available = box.current.clientWidth - parseFloat(metrics.paddingLeft || 0) - parseFloat(metrics.paddingRight || 0) - 2;
             if (available <= 0) return;
             text.current.style.fontSize = `${maxSize}px`;
             const width = text.current.getBoundingClientRect().width;

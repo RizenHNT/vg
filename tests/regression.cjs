@@ -6,9 +6,14 @@ const html = fs.readFileSync('dist/index.html', 'utf8');
 const code = fs.readFileSync('dist/' + html.match(/src="\/([^"]+\.js)"/)[1], 'utf8');
 const css = fs.readFileSync('dist/' + html.match(/href="\/([^"]+\.css)"/)[1], 'utf8');
 const wait = (ms = 24) => new Promise(resolve => setTimeout(resolve, ms));
-async function boot(save) {
+async function boot(save, measuredFit = false) {
     const errors = [];
     const dom = new JSDOM('<style>' + css + '</style><div id="root"></div>', { url: 'https://vg.test', runScripts: 'outside-only', pretendToBeVisual: true });
+    if (measuredFit) {
+        Object.defineProperty(dom.window.HTMLElement.prototype, 'clientWidth', { configurable: true, get() { return this.classList.contains('power-fit') ? 80 : 0; } });
+        const original = dom.window.HTMLElement.prototype.getBoundingClientRect;
+        dom.window.HTMLElement.prototype.getBoundingClientRect = function() { if (this.classList.contains('power-value')) return { width: parseFloat(this.style.fontSize) * 3.75 }; return original.call(this); };
+    }
     dom.window.console.error = (...args) => errors.push(args.join(' '));
     if (save !== undefined) dom.window.localStorage.setItem(KEY, typeof save === 'string' ? save : JSON.stringify(save));
     dom.window.eval(code); await wait();
@@ -51,6 +56,12 @@ async function boot(save) {
     await x.click('ride-action'); assert.equal(x.state().units.front_center.grade, 1); assert.equal(x.state().units.front_center.basePower, 8000);
     await x.text('回合开始'); assert.equal(x.state().units.front_center.grade, 1); assert.equal(x.state().energy, 0);
     await x.click('turn-toggle'); x.done();
+
+    // Width fitting accounts for the actual cell padding, including nine-digit OT totals.
+    x = await boot({units:{front_center:{grade:3,basePower:13000,powerBuff:100000000,otActive:true}}}, true);
+    const numeral=x.test('unit-front_center').querySelector('.power-value');
+    assert.ok(numeral.getBoundingClientRect().width <= 68, 'numeral respects 80px box minus 10px padding and safety gap');
+    x.done();
 
     // Main grade click opens quick choices and custom input, never a unit drawer.
     x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 10000 }, front_left: { grade: 2, basePower: 11000 } } });
