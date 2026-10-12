@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
 permissions:
-  contents: write
+  contents: read
 jobs:
   regression:
     runs-on: ubuntu-latest
@@ -16,22 +16,9 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci
-      - run: node scripts/fetch-official-symbols.cjs
       - run: npm test
       - run: node scripts/prepare-review.cjs
       - uses: actions/upload-artifact@v4
         with:
           name: vg-mobile-preview
           path: dist/review-preview.html
-      - name: Save validated preview only to the isolated branch
-        if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'design/official-playmat-preview'
-        run: |
-          git config user.name "VG preview checks"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- dist public/symbols public/review-preview.html
-          if ! git diff --cached --quiet; then
-            git commit -m "Save validated mobile preview and official symbols"
-            git push origin HEAD:refs/heads/design/official-playmat-preview
-            git rev-parse HEAD
-            git rev-parse HEAD^{tree}
-          fi
