@@ -143,6 +143,12 @@ async function boot(save) {
     await x.text('回合结束'); assert.equal(x.state().units.front_center.grade, 3); assert.equal(x.state().units.front_center.basePower, 13000); assert.equal(x.state().units.front_center.powerBuff, 0); assert.equal(x.test('ride-action').textContent, '超越');
     x.done();
 
+    x = await boot({ units:{front_center:{grade:3,basePower:17000,powerBuff:10000}} });
+    await x.click('turn-toggle'); await x.click('ride-action');
+    assert.equal(x.state().units.front_center.basePower,32000,'Stride adds 15000 to the edited heart base');
+    assert.equal(x.state().units.front_center.powerBuff,10000);
+    await x.text('回合结束');assert.equal(x.state().units.front_center.basePower,17000);assert.equal(x.state().units.front_center.grade,3);x.done();
+
     // Long press drag swaps actual unit fields, cancels safely and prevents accidental drawers.
     x = await boot({ units:{front_left:{grade:2,basePower:10000,powerBuff:1000,crit:2},back_right:{grade:1,basePower:8000}} });
     await x.drag('front_left', x.test('unit-back_right'));

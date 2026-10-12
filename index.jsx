@@ -879,7 +879,7 @@ export default function App() {
         const stride = v.grade >= 3;
         const heart = stride ? { grade: v.grade, basePower: v.basePower, hasBoost: v.hasBoost, hasDoubleStrike: v.hasDoubleStrike, hasTripleStrike: v.hasTripleStrike } : null;
         updateState({ units: { ...current.units, front_center: {
-            ...v, grade: nextGrade, basePower: GRADE_PRESETS[nextGrade] ?? DEFAULT_GRADE_PRESETS[nextGrade],
+            ...v, grade: nextGrade, basePower: stride ? v.basePower + 15000 : (GRADE_PRESETS[nextGrade] ?? DEFAULT_GRADE_PRESETS[nextGrade]),
             hasBoost: nextGrade <= 1, hasDoubleStrike: nextGrade === 3, hasTripleStrike: nextGrade === 4,
             isStriding: stride, heart,
         } } });
@@ -1143,8 +1143,8 @@ export default function App() {
         const selected = selectedSlot === id;
         const target = dragState?.target === id;
         const source = swapSource === id;
-        const border = isVanguardSlot ? 'border-red-500' : 'border-slate-800';
-        const tone = selected ? 'bg-slate-800 border-yellow-400' : source || target ? 'bg-blue-900/20 border-blue-500' : unit.isRested ? 'bg-slate-950/90 opacity-40' : unit.isSupporting ? 'bg-green-900/20' : isVanguardSlot ? 'bg-red-950/20' : 'bg-slate-900/80';
+        const border = selected ? 'border-yellow-400' : source || target ? 'border-blue-500' : isVanguardSlot ? 'border-red-500' : 'border-slate-800';
+        const tone = selected ? 'bg-slate-800' : source || target ? 'bg-blue-900/20' : unit.isRested ? 'bg-slate-950/90 opacity-40' : unit.isSupporting ? 'bg-green-900/20' : isVanguardSlot ? 'bg-red-950/20' : 'bg-slate-900/80';
         const numberTone = unit.otActive ? 'rainbow-text' : isVanguardSlot ? 'text-blue-400' : power > 0 ? 'text-yellow-400' : power < 0 ? 'text-red-500' : 'text-slate-400';
         return <div key={id} role="group" tabIndex={0} aria-label={label + ' ' + formatNumber(power)}
             data-testid={'unit-' + id} data-slot={id} data-value={power} data-reserved={reserved}
