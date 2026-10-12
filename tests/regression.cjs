@@ -180,7 +180,7 @@ async function boot(save) {
 
     // Back-row intercept requires explicit ability override; Vanguard never enters guardian circle.
     x = await boot({ units:{back_left:{grade:2,basePower:10000,shield:15000},front_right:{grade:1,basePower:8000}} });
-    await x.click('guard-toggle'); await x.drag('back_left', x.test('guard-circle')); assert.equal(x.state()?.guardSlots.length ?? 0, 0);
+    await x.click('guard-toggle'); await x.drag('back_left', x.test('guard-circle')); assert.equal(x.state()?.guardSlots?.length ?? 0, 0);
     await x.click('turn-toggle'); await x.click('back-intercept');
     await x.drag('back_left', x.test('guard-circle')); assert.deepEqual(x.state().guardSlots, ['back_left']); assert.equal(Number(x.test('guard-circle').dataset.value), 15000);
     assert.equal(x.state().units.back_left.basePower, 10000);
