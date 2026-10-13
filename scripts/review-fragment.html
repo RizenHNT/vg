@@ -1,0 +1,40 @@
+<div id="vg-readable-field-review">
+  <div class="nav nav-pills" role="group" aria-label="预览尺寸">
+    <button type="button" class="nav-link active" aria-pressed="true" data-review-width="390">手机</button>
+    <button type="button" class="nav-link" aria-pressed="false" data-review-width="1080">电脑</button>
+  </div>
+  <div class="review-viewport"><iframe title="VG 隔离审阅版" sandbox="allow-scripts allow-same-origin"></iframe></div>
+</div>
+<style>
+  #vg-readable-field-review{width:100%;min-width:0}
+  #vg-readable-field-review .review-viewport{position:relative;width:100%;overflow:hidden;margin-top:8px}
+  #vg-readable-field-review iframe{position:absolute;top:0;left:50%;border:0;transform-origin:top left;background:transparent}
+</style>
+<script>
+(() => {
+  const root = document.getElementById('vg-readable-field-review');
+  const frame = root.querySelector('iframe');
+  const viewport = root.querySelector('.review-viewport');
+  let width = 390;
+  const fit = () => {
+    const scale = Math.min(1, viewport.clientWidth / width);
+    const height = width < 1000 ? 840 : 900;
+    frame.style.width = width + 'px'; frame.style.height = height + 'px';
+    frame.style.transform = 'translateX(' + (-width * scale / 2) + 'px) scale(' + scale + ')';
+    viewport.style.height = height * scale + 'px';
+  };
+  frame.srcdoc = __SRC_DOC__;
+  root.querySelectorAll('[data-review-width]').forEach(button => {
+    button.addEventListener('click', () => {
+      width = Number(button.dataset.reviewWidth);
+      root.querySelectorAll('[data-review-width]').forEach(peer => {
+        peer.classList.toggle('active', peer === button);
+        peer.setAttribute('aria-pressed', String(peer === button));
+      });
+      fit();
+    });
+  });
+  new ResizeObserver(fit).observe(viewport);
+  fit();
+})();
+</script>

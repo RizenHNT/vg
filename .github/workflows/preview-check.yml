@@ -1,0 +1,32 @@
+name: Preview checks
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: node scripts/prepare-review.cjs
+      - run: npm install --no-save --package-lock=false playwright@1.62.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/mobile-layout.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vg-layout-screenshots
+          path: layout-qa/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vg-mobile-preview
+          path: dist/review-preview.html

@@ -1,0 +1,31 @@
+{
+  "file": "vg-tech-atlas.png",
+  "generated_from": [
+    {
+      "kind": "critical",
+      "url": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_ct.jpg"
+    },
+    {
+      "kind": "boost",
+      "url": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_bt.jpg"
+    },
+    {
+      "kind": "intercept",
+      "url": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_is.jpg"
+    },
+    {
+      "kind": "double-drive",
+      "url": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_2d.jpg"
+    },
+    {
+      "kind": "triple-drive",
+      "url": "https://cf-vanguard.com/wordpress/wp-content/uploads/f_guide_icon_3d.jpg"
+    }
+  ],
+  "processing": "Image model redraw of the official symbol silhouettes; transparent dark-blue UI atlas; added card-orientation icons. Not an official asset.",
+  "dimensions": [
+    1254,
+    1254
+  ],
+  "license_note": "Original official references remain attributed in SOURCES.json; this derived asset is for the calculator review."
+}
