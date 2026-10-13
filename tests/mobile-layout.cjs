@@ -15,7 +15,7 @@ const demo = { language:'zh', energy:5, units:{front_center:{grade:3,basePower:1
             const page=await browser.newPage({viewport:{width,height:900}});const errors=[];
             page.on('pageerror',error=>errors.push(error.message));
             await page.goto('http://127.0.0.1:4173');
-            await page.evaluate(save=>localStorage.setItem('VG_DRAWER_PREVIEW_V1',JSON.stringify(save)),demo);
+            await page.evaluate(save=>localStorage.setItem('VG_COMBAT_STATE_V20_LOCAL',JSON.stringify(save)),demo);
             await page.reload();await page.getByTestId('unit-front_center').waitFor();await page.evaluate(()=>document.fonts.ready);
             await page.getByTestId('guard-toggle').click();
             const circle=await page.getByTestId('guard-circle').boundingBox();assert.ok(Math.abs(circle.width/circle.height-2)<.04,'flat elliptical G ring');

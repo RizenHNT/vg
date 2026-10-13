@@ -9,7 +9,7 @@ import {
 
 // --- Constants & Data ---
 const MAX_ENERGY = 10;
-const STORAGE_KEY = 'VG_DRAWER_PREVIEW_V1'; // 隔离审阅，不写正式站存档
+const STORAGE_KEY = 'VG_COMBAT_STATE_V20_LOCAL'; // 正式站沿用现有存档；嵌入预览使用独立内存存储
 
 
 const INITIAL_UNIT = {
@@ -236,7 +236,8 @@ function PowerNumber({ value, className = '', maxSize = 34, resetKey = '' }) {
         const fit = () => {
             if (!box.current || !text.current) return;
             const metrics = getComputedStyle(box.current);
-            const available = box.current.clientWidth - parseFloat(metrics.paddingLeft || 0) - parseFloat(metrics.paddingRight || 0) - 2;
+            const boxWidth = box.current.getBoundingClientRect().width || box.current.clientWidth;
+            const available = boxWidth - parseFloat(metrics.paddingLeft || 0) - parseFloat(metrics.paddingRight || 0) - parseFloat(metrics.borderLeftWidth || 0) - parseFloat(metrics.borderRightWidth || 0) - 2;
             if (available <= 0) return;
             text.current.style.fontSize = `${maxSize}px`;
             const width = text.current.getBoundingClientRect().width;
@@ -247,8 +248,9 @@ function PowerNumber({ value, className = '', maxSize = 34, resetKey = '' }) {
         observer?.observe(box.current);
         let mounted = true;
         document.fonts?.ready.then(() => { if (mounted) fit(); });
-        return () => { mounted = false; observer?.disconnect(); };
-    }, [value, maxSize]);
+        document.fonts?.addEventListener('loadingdone', fit);
+        return () => { mounted = false; observer?.disconnect(); document.fonts?.removeEventListener('loadingdone', fit); };
+    }); // Refit before paint when a rail or another layout control changes width.
     return <span ref={box} className={`power-fit ${className}`}><span ref={text} className="power-value" style={{ fontSize: maxSize }}><RollingDigits value={value} resetKey={resetKey} /></span></span>;
 }
 

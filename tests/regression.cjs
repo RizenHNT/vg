@@ -1,7 +1,7 @@
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
-const KEY = 'VG_DRAWER_PREVIEW_V1';
+const KEY = 'VG_COMBAT_STATE_V20_LOCAL';
 const html = fs.readFileSync('dist/index.html', 'utf8');
 const code = fs.readFileSync('dist/' + html.match(/src="\/([^"]+\.js)"/)[1], 'utf8');
 const css = fs.readFileSync('dist/' + html.match(/href="\/([^"]+\.css)"/)[1], 'utf8');
