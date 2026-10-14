@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "VG Counter · 先导者对战计数器",
+  "short_name": "VG Counter",
+  "description": "Unofficial Cardfight!! Vanguard counter for casual games: power, critical, Energy and shield. EN / 中文 / 日本語.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "prefer_related_applications": false,
+  "categories": ["utilities", "games"],
+  "icons": [
+    { "src": "/icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /review-preview.html
+Disallow: /design-preview.html
+Disallow: /mobile-preview.html
+Sitemap: https://vg-counter.vercel.app/sitemap.xml

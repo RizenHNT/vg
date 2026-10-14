@@ -10,7 +10,7 @@ const demo = { language:'zh', energy:5, units:{front_center:{grade:3,basePower:1
     let browser;
     try {
         for(let i=0;i<40;i++){try{if((await fetch('http://127.0.0.1:4173')).ok)break;}catch{}await wait(250);}
-        browser=await chromium.launch({headless:true});
+        browser=await chromium.launch({headless:true,...(process.env.VG_BROWSER_CHANNEL ? {channel:process.env.VG_BROWSER_CHANNEL} : {})});
         for(const width of [320,390,430,1440]) {
             const page=await browser.newPage({viewport:{width,height:900}});const errors=[];
             page.on('pageerror',error=>errors.push(error.message));

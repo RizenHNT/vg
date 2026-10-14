@@ -1,0 +1,41 @@
+const CACHE_PREFIX = 'vg-counter-shell-';
+const CACHE_NAME = CACHE_PREFIX + __VERSION__;
+const PRECACHE = __PRECACHE__;
+const KNOWN_ASSETS = new Set(PRECACHE);
+
+self.addEventListener('install', event => {
+    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE)));
+    // Keep the running game intact. A waiting update activates on user request.
+});
+self.addEventListener('activate', event => {
+    event.waitUntil((async () => {
+        const old = (await caches.keys()).filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME);
+        // One preceding shell keeps assets available to any already-open tabs.
+        await Promise.all(old.slice(0, -1).map(key => caches.delete(key)));
+        await self.clients.claim();
+    })());
+});
+async function cachedAsset(path) {
+    const current = await (await caches.open(CACHE_NAME)).match(path);
+    if (current) return current;
+    const previous = (await caches.keys()).filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).reverse();
+    for (const key of previous) {
+        const found = await (await caches.open(key)).match(path);
+        if (found) return found;
+    }
+}
+self.addEventListener('fetch', event => {
+    const request = event.request;
+    const url = new URL(request.url);
+    if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+    if (request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/index.html')) {
+        // The shell and its versioned assets stay together until the update is accepted.
+        event.respondWith(cachedAsset('/index.html').then(found => found || fetch(request)));
+    } else if (KNOWN_ASSETS.has(url.pathname) || /^\/assets\/[^/]+\.(js|css)$/.test(url.pathname)) {
+        event.respondWith(cachedAsset(url.pathname).then(found => found || fetch(request)));
+    }
+});
+self.addEventListener('message', event => {
+    if (event.data?.type === 'APPLY_UPDATE') self.skipWaiting();
+    if (event.data?.type === 'CLAIM_CLIENTS') event.waitUntil(self.clients.claim());
+});
