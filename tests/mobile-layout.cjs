@@ -18,8 +18,10 @@ const demo = { language:'zh', energy:5, units:{front_center:{grade:3,basePower:1
             await page.evaluate(save=>localStorage.setItem('VG_COMBAT_STATE_V20_LOCAL',JSON.stringify(save)),demo);
             await page.reload();await page.getByTestId('unit-front_center').waitFor();await page.evaluate(()=>document.fonts.ready);
             const closed=await page.locator('.energy-section').boundingBox();
-            assert.ok(900-closed.y-closed.height<=28,'closed guard uses the lower viewport '+JSON.stringify({width,closed}));
-            assert.ok(closed.y+closed.height<=902,'energy stays visible without vertical overflow');
+            const matchPanel=await page.getByTestId('match-panel').boundingBox();
+            const firstRow=await page.getByTestId('unit-front_center').boundingBox();const secondRow=await page.getByTestId('unit-back_center').boundingBox();
+            assert.ok(secondRow.y-firstRow.y<=160,'field rows remain compact');
+            assert.ok(matchPanel.y>=closed.y+closed.height&&matchPanel.y-closed.y-closed.height<=16,'useful match controls follow EN');
             await page.screenshot({path:`layout-qa/${width}-guard-closed.png`,fullPage:true});
             await page.getByTestId('shield-front_left').click();
             const shieldPicker=await page.getByTestId('shield-picker').boundingBox();
@@ -63,7 +65,8 @@ const demo = { language:'zh', energy:5, units:{front_center:{grade:3,basePower:1
             assert.equal(await page.getByTestId('unit-front_center').getAttribute('data-value'),'100013000');
             const fit=await page.getByTestId('unit-front_center').locator('.power-value').evaluate(el=>({text:el.getBoundingClientRect().width,box:el.parentElement.getBoundingClientRect().width}));assert.ok(fit.text<=fit.box+1,'OT numeral fits');
             const otColors=await page.getByTestId('unit-front_center').locator('.digit-static,.digit-track>span').evaluateAll(items=>items.map(el=>getComputedStyle(el).color));
-            assert.ok(otColors.every(color=>color==='rgb(241, 237, 255)'),'OT digits remain visible while their reels move');
+            assert.ok(otColors.every(color=>color!=='rgba(0, 0, 0, 0)'&&color!=='transparent'),'OT digits remain visible while their reels move');
+            assert.ok(new Set(otColors).size>1,'OT uses colored luminous digits');
             await wait(400);await page.screenshot({path:`layout-qa/${width}-ot-field.png`,fullPage:true});
             await page.getByTestId('unit-front_center').click();await page.getByTestId('drawer-power').waitFor();await page.screenshot({path:`layout-qa/${width}-drawer.png`,fullPage:true});
             const oldPower=await page.getByTestId('drawer-power').getAttribute('data-value');
@@ -77,12 +80,12 @@ const demo = { language:'zh', energy:5, units:{front_center:{grade:3,basePower:1
             const summary=await page.locator('.drawer-summary').boundingBox();assert.ok(summary.x>=0&&summary.x+summary.width<=width,'drawer values fit narrow screens');
             await page.screenshot({path:`layout-qa/${width}-shield-drawer.png`,fullPage:true});await page.getByTestId('unit-close').click();
             if(width===1440){await page.getByTestId('settings-edge').click();const settings=await page.locator('.tools-panel').boundingBox();const main=await page.locator('main').boundingBox();assert.ok(settings.x>=main.x+main.width,'settings uses right margin');assert.equal(await page.locator('body').evaluate(el=>el.style.overflow),'');await page.screenshot({path:'layout-qa/1440-settings.png',fullPage:true});}
-            assert.deepEqual(errors,[]);console.log('PASS browser:',width,'viewport fill, shield picker/switch, G ellipse, rails, drag shield, triggers, readable OT and drawer');await page.close();
+            assert.deepEqual(errors,[]);console.log('PASS browser:',width,'compact field, match tools, shield switch, G ellipse, rails, drag shield, triggers and glowing OT');await page.close();
         }
         const shortPage=await browser.newPage({viewport:{width:320,height:640}});
         await shortPage.goto('http://127.0.0.1:4173');await shortPage.getByTestId('unit-front_center').waitFor();await shortPage.evaluate(()=>document.fonts.ready);
         const shortEnergy=await shortPage.locator('.energy-section').boundingBox();assert.ok(shortEnergy.y+shortEnergy.height<=642,'EN fits a short 320x640 viewport');
-        assert.ok(640-shortEnergy.y-shortEnergy.height<=28,'short viewport has no unused lower area');
+        const shortMatch=await shortPage.getByTestId('match-panel').boundingBox();assert.ok(shortMatch.y>=shortEnergy.y+shortEnergy.height&&shortMatch.y-shortEnergy.y-shortEnergy.height<=16,'short viewport continues into the useful match panel');
         await shortPage.screenshot({path:'layout-qa/320-short-closed.png',fullPage:true});await shortPage.close();
     } finally { await browser?.close();server.kill(); }
 })().catch(error=>{console.error(error);process.exitCode=1});
