@@ -14,18 +14,30 @@ function publish(change) {
     status = { ...status, ...change };
     listeners.forEach(listener => listener(status));
 }
-async function register() {
-    registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
+function watchRegistration(current) {
+    registration = current;
     const watch = worker => {
         if (!worker) return;
         worker.addEventListener('statechange', () => {
-            if (worker.state === 'installed') publish({ update: !!registration.waiting && !!navigator.serviceWorker.controller });
+            if (worker.state === 'installed') publish({ update: !!current.waiting && !!navigator.serviceWorker.controller });
             if (worker.state === 'redundant' && !navigator.serviceWorker.controller) publish({ failed: true });
         });
     };
-    watch(registration.installing);
-    registration.addEventListener('updatefound', () => watch(registration.installing));
-    publish({ update: !!registration.waiting && !!navigator.serviceWorker.controller });
+    watch(current.installing);
+    current.addEventListener('updatefound', () => watch(current.installing));
+    publish({ update: !!current.waiting && !!navigator.serviceWorker.controller });
+}
+async function register() {
+    const existing = await navigator.serviceWorker.getRegistration('/');
+    if (existing?.active) {
+        watchRegistration(existing);
+        publish({ ready: true, failed: false });
+        existing.active.postMessage({ type: 'CLAIM_CLIENTS' });
+        // Reopening offline uses the installed shell without a network registration.
+        if (navigator.onLine === false) return;
+    }
+    const current = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
+    watchRegistration(current);
     const active = await navigator.serviceWorker.ready;
     // A navigation during the first install can miss the activation's claim.
     active.active?.postMessage({ type: 'CLAIM_CLIENTS' });
@@ -41,10 +53,10 @@ export function startPwa() {
         publish({ ready: true, update: false });
         if (reloadAfterUpdate) window.location.reload();
     });
-    register().catch(() => publish({ failed: true }));
+    register().catch(() => { if (!status.ready) publish({ failed: true }); });
     window.addEventListener('online', () => {
         if (registration && status.ready) registration.update().catch(() => {});
-        else register().catch(() => publish({ failed: true }));
+        else register().catch(() => { if (!status.ready) publish({ failed: true }); });
     });
 }
 export function applyPwaUpdate() {

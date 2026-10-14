@@ -66,8 +66,7 @@ const seed = { language:'en', energy:5, units:{ front_center:{grade:3,basePower:
             window.dispatchEvent(event);
         });
         await page.getByTestId('settings-toggle').click();
-        await page.getByTestId('pwa-offline').waitFor();
-        assert.equal(await page.getByTestId('pwa-offline').getAttribute('data-ready'),'true');
+        await page.waitForFunction(()=>document.querySelector('[data-testid=pwa-offline]')?.dataset.ready==='true');
         await page.getByTestId('pwa-install').click();
         assert.equal(await page.evaluate(()=>window.promptCalls),1);
         await page.getByTestId('pwa-install').click();
@@ -94,7 +93,8 @@ const seed = { language:'en', energy:5, units:{ front_center:{grade:3,basePower:
         const save = await relaunch.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
         assert.equal(save.extraCounters[0].value,7);
         await relaunch.getByTestId('settings-toggle').click();
-        await relaunch.getByText('Offline · you can keep playing',{exact:true}).waitFor();
+        try { await relaunch.getByText('Offline · you can keep playing',{exact:true}).waitFor(); }
+        catch (error) { console.error('Offline status diagnostic:',await relaunch.evaluate(async()=>({online:navigator.onLine,controlled:!!navigator.serviceWorker.controller,status:document.querySelector('[data-testid=pwa-offline]')?.textContent,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>r.active?.state)}))); throw error; }
         await relaunch.screenshot({path:'layout-qa/pwa-offline.png',fullPage:true});
         await relaunch.close();
 
