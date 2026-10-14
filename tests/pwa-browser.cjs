@@ -79,9 +79,6 @@ const seed = { language:'en', energy:5, units:{ front_center:{grade:3,basePower:
         await page.keyboard.press('Escape');
 
         await context.setOffline(true);
-        // New Chromium targets can retain an online navigator hint while requests
-        // are offline. Set both native network state and the request blockade.
-        await cdp.send('Network.overrideNetworkState',{offline:true,latency:0,downloadThroughput:0,uploadThroughput:0});
         assert.equal(await page.evaluate(async()=>{try{await fetch('/uncached-network-probe');return false;}catch{return true;}}),true,'uncached network requests are blocked');
         await page.reload();
         await page.getByTestId('unit-front_center').waitFor();
@@ -91,13 +88,16 @@ const seed = { language:'en', energy:5, units:{ front_center:{grade:3,basePower:
         assert.equal(await page.getByTestId('drawer-power').getAttribute('data-value'),'23000');
         await page.getByTestId('unit-close').click();
         const relaunch = await context.newPage();
-        const relaunchCdp = await context.newCDPSession(relaunch);
-        await relaunchCdp.send('Network.overrideNetworkState',{offline:true,latency:0,downloadThroughput:0,uploadThroughput:0});
         await relaunch.goto(base+'/?utm_source=offline-check');
         await relaunch.getByTestId('unit-front_center').waitFor();
         assert.equal(await relaunch.getByTestId('unit-front_center').getAttribute('data-value'),'23000','new offline launch loads the modified save');
         const save = await relaunch.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
         assert.equal(save.extraCounters[0].value,7);
+        assert.equal(await relaunch.evaluate(async()=>{try{await fetch('/uncached-network-probe');return false;}catch{return true;}}),true,'new offline windows cannot make uncached network requests');
+        // navigator.onLine is a LAN hint, not proof of an Internet connection.
+        // Offline loading/editing above is tested with genuinely blocked requests;
+        // exercise the separate status-hint UI with a deterministic browser signal.
+        await relaunch.evaluate(()=>{Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});window.dispatchEvent(new Event('offline'));});
         await relaunch.getByTestId('settings-toggle').click();
         try { await relaunch.getByText('Offline · you can keep playing',{exact:true}).waitFor(); }
         catch (error) { console.error('Offline status diagnostic:',await relaunch.evaluate(async()=>({online:navigator.onLine,controlled:!!navigator.serviceWorker.controller,status:document.querySelector('[data-testid=pwa-offline]')?.textContent,registrations:(await navigator.serviceWorker.getRegistrations()).map(r=>r.active?.state)}))); throw error; }
@@ -106,7 +106,6 @@ const seed = { language:'en', energy:5, units:{ front_center:{grade:3,basePower:
 
         // A completed update waits until the player chooses to apply it.
         await context.setOffline(false);
-        await cdp.send('Network.overrideNetworkState',{offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1});
         update = true;
         await page.evaluate(async()=>{await (await navigator.serviceWorker.getRegistration()).update();});
         await page.getByTestId('pwa-update').waitFor();
@@ -119,7 +118,6 @@ const seed = { language:'en', energy:5, units:{ front_center:{grade:3,basePower:
         const caches = await page.evaluate(()=>window.caches.keys());
         assert.equal(caches.filter(key=>key.startsWith('vg-counter-shell-')).length,2,'current and preceding shell retained');
         await context.setOffline(true);
-        await cdp.send('Network.overrideNetworkState',{offline:true,latency:0,downloadThroughput:0,uploadThroughput:0});
         await page.reload();
         await page.getByTestId('unit-front_center').waitFor();
         assert.equal(await page.getByTestId('unit-front_center').getAttribute('data-value'),'23000');
