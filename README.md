@@ -4,6 +4,10 @@ A mobile-friendly Cardfight!! Vanguard tabletop counter, with Chinese, Japanese 
 
 ## Use
 
+- Open Settings to **Install app**, share the link, or read the platform's installation steps. iPhone/iPad users can use Safari → Share → Add to Home Screen; Android/desktop users can use the browser's install menu.
+- Open online once and wait for **Ready offline** in Settings. The six-slot counter then works offline, including reopening and saving a game. Browsers and installed home-screen apps may keep separate records; continue a game from the same entry point.
+- An available update appears above the field. **Update & keep my save** applies it when you choose; an ongoing game is never reloaded automatically. The production save key is retained.
+
 - Tap a unit to edit power, modifiers and critical. Its sheet scrolls independently and closes using its top button, backdrop or Escape.
 - Tap the grade badge to set the actual card grade. Grade and power are independent.
 - **Turn Start** stands units and clears temporary power/critical, attack history and shield. It does not Ride or charge energy.
@@ -22,6 +26,10 @@ npm test
 ```
 
 Production CSS is generated locally using Tailwind, without the runtime Tailwind CDN. The committed `dist/` contains the production build. Regression tests exercise the built application in jsdom, including damaged old saves and guard equality.
+
+The build creates `sw.js` from `pwa/sw-template.js`, with a content-derived cache version and a complete app shell. It caches only the calculator's entry page and local assets. Updates wait for the user's action; the preceding shell is retained for already-open tabs. No game data is sent to a server. Install icons are original vector artwork in `public/icons/app.svg`.
+
+Browser checks run with Playwright: `node tests/mobile-layout.cjs` and `node tests/pwa-browser.cjs`. The latter checks browser installability, old-save restoration, offline reload/new launch/edit, sharing fallback, and applying an update without losing the save. For a local Edge check, set `VG_BROWSER_CHANNEL=msedge`. The GitHub workflow installs its own Chromium test runtime.
 
 ## Rule references
 

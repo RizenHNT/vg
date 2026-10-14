@@ -1,0 +1,9 @@
+.pwa-tools{margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid #1e293b;font-size:12px;line-height:1.6;color:#94a3b8}
+.pwa-tool-buttons{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px}
+.pwa-tool-buttons button{display:flex;align-items:center;justify-content:center;gap:5px;min-height:44px;padding:6px;border:1px solid #155e75;border-radius:6px;background:#08334455;color:#a5f3fc;line-height:1.35}
+.pwa-tool-buttons button:disabled{opacity:.6;cursor:default}.pwa-tools button:focus-visible,.pwa-tools summary:focus-visible,.pwa-update button:focus-visible{outline:2px solid #67e8f9;outline-offset:2px}
+.pwa-offline{display:flex;align-items:center;gap:5px;margin-top:8px;color:#64748b}.pwa-offline[data-ready=true]{color:#86efac}
+.pwa-feedback{color:#67e8f9;margin-top:4px}.pwa-tools summary{cursor:pointer;min-height:32px;align-content:center;color:#cbd5e1}.pwa-tools details p{margin:7px 0;overflow-wrap:anywhere}
+.pwa-unofficial{margin-top:4px;font-size:10px;color:#64748b}.pwa-link{display:block;margin:8px 0}.pwa-link input{display:block;width:100%;min-width:0;background:#020617;border:1px solid #334155;border-radius:4px;padding:6px;color:#cbd5e1;font-size:12px}
+.pwa-update{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;padding:8px 24px;background:#083344;color:#cffafe;font-size:12px;position:relative;z-index:41}
+.pwa-update button{display:flex;align-items:center;gap:5px;min-height:36px;padding:4px 8px;border:1px solid #0e7490;border-radius:5px;background:#155e75}

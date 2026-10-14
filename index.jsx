@@ -1,5 +1,7 @@
 import './styles.css';
 import './drawer-enhancements.css';
+import { PwaTools, PwaUpdateNotice } from './PwaTools.jsx';
+import { startPwa } from './pwa-runtime.js';
 import React, { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
 import {
     Sword, Zap, RotateCcw, X, Settings2, Dices, CircleDollarSign, ChevronDown,
@@ -619,6 +621,7 @@ function ChanceTools({ t }) {
 }
 
 export default function App() {
+    useEffect(() => { startPwa(); }, []);
     const [loading, setLoading] = useState(true);
     const [gameState, setGameState] = useState(INITIAL_GAME_STATE);
     const [selectedSlot, setSelectedSlot] = useState(null);
@@ -1398,6 +1401,7 @@ export default function App() {
                     <div className="relative header-settings"><button aria-label={t.settings} data-testid="settings-toggle" onClick={() => togglePanel('tools')} className={`p-2 rounded transition-colors ${showTools ? 'text-cyan-400 bg-cyan-950' : 'text-slate-400'}`}><Settings2 size={18} /></button></div>
                 </div>
             </header>
+            <PwaUpdateNotice language={language} />
             <button type="button" className="edge-handle edge-left" data-testid="turn-toggle" aria-label={t.turn_controls} aria-expanded={showTopControls} aria-controls="top-controls" onClick={() => togglePanel('turn')}><RefreshCcw size={14} /><span>{language === 'zh' ? '回合' : language === 'ja' ? 'ターン' : 'Turn'}</span></button>
             <button type="button" className="edge-handle edge-right" data-testid="settings-edge" aria-label={t.settings} aria-expanded={showTools} onClick={() => togglePanel('tools')}><Settings2 size={14} /><span>{t.settings}</span></button>
             {showTopControls && renderTurnPanel()}
@@ -1409,6 +1413,7 @@ export default function App() {
                         <div className="flex justify-between text-[10px] text-cyan-500 mb-2 uppercase tracking-wider items-center"><Globe size={12} className="mr-1" />{t.language}</div>
                         <div className="grid grid-cols-3 gap-2">{LANGUAGES.map(lang => (<button key={lang.code} onClick={() => handleLanguageChange(lang.code)} className={`py-1.5 rounded text-xs font-bold transition-colors border ${language === lang.code ? 'bg-cyan-700/50 text-white border-cyan-500' : 'bg-slate-800/50 text-slate-300 border-slate-700 hover:bg-slate-700/50'}`}>{lang.name}</button>))}</div>
                     </div>
+                    <PwaTools language={language} />
                     <ChanceTools t={t} />
                     <div className="free-counters">
                         <div className="text-xs text-slate-400 mb-2">{t.counter}</div>
