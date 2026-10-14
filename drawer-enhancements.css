@@ -141,7 +141,6 @@
 .guard-finish{display:grid;grid-template-columns:1fr 1fr;gap:8px}.guard-finish button{min-height:44px;border-radius:6px;border:1px solid #334155;color:#94a3b8;background:#1e293b;font-size:13px}.guard-finish button:last-child{border-color:#166534;background:#14532d66;color:#86efac}
 .pg-settings{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;font-size:12px;color:#94a3b8}.pg-settings input{width:70px;min-height:40px;border:1px solid #334155;border-radius:5px;background:#020617;padding:5px;font-size:16px;color:#cbd5e1}
 .power-fit.rainbow-text{background:none;color:inherit;animation:none}
-.power-fit.rainbow-text .digit-static,.power-fit.rainbow-text .digit-track>span,.power-fit.rainbow-text .digit-punctuation{background:linear-gradient(90deg,#ff7f00,#facc15,#4ade80,#60a5fa,#c084fc);background-size:200% 100%;background-clip:text;-webkit-background-clip:text;color:transparent;animation:colorShift 5s linear infinite}
 @media(max-width:360px){.battle-main{padding-right:8px}.battle-board{gap:5px}.slot-topline{padding-left:2px;padding-right:2px}.slot-symbol-button{width:21px}.slot-abilities .official-symbol{width:15px;height:15px}.drawer-critical{grid-template-columns:32px minmax(24px,auto) 32px}.drawer-critical button{width:32px}.drawer-toolbar{gap:5px}}
 @media(prefers-reduced-motion:reduce){.digit-track{animation:none!important}.power-fit.rainbow-text .digit-static,.power-fit.rainbow-text .digit-track>span,.power-fit.rainbow-text .digit-punctuation{animation:none!important}}
 
@@ -236,3 +235,53 @@
 .support-choice{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:#93c5fd;margin-bottom:8px}
 .support-choice button{display:flex;align-items:center;justify-content:center;width:40px;min-height:40px;color:#94a3b8}
 .turn-actions button:nth-child(5){margin-top:8px}
+
+/* Let the two field rows use the available height with either guard state. */
+.vg-app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.vg-app>header{flex:none}
+.battle-main{flex:1;display:flex;flex-direction:column;gap:16px;width:100%;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.field-section{flex:1;display:flex;flex-direction:column;min-height:0}
+.battle-board{flex:1;grid-template-rows:minmax(148px,1fr) minmax(148px,1fr) auto;align-items:center;row-gap:12px}
+.battle-board.has-back-attack{grid-template-rows:minmax(148px,1fr) auto minmax(148px,1fr) auto}
+.energy-section,#guard-circle-area{flex:none}
+.turn-open .battle-board{grid-template-rows:minmax(134px,1fr) minmax(134px,1fr) auto}
+.turn-open .battle-board.has-back-attack{grid-template-rows:minmax(134px,1fr) auto minmax(134px,1fr) auto}
+
+/* Printed shield follows the left side of the field circle. */
+.slot-shield{position:absolute;z-index:3;left:0;top:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:30px;min-height:58px;padding:3px 4px;border-left:2px solid #4ade8077;border-radius:9px;background:linear-gradient(90deg,#052e16e6,#052e1644);color:#86efac}
+.slot-shield span{writing-mode:vertical-rl;transform:rotate(180deg);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;line-height:1}
+.slot-shield:hover,.slot-shield:focus-visible{border-color:#86efac;background:#14532dbb;outline:1px solid #4ade8077}
+.unit-slot[data-intercept-shield=true] .unit-power{padding-left:26px}
+.shield-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.shield-options button{min-height:40px;border:1px solid #23533d;border-radius:5px;background:#0b2119;color:#86efac;font-family:'Barlow Condensed',sans-serif;font-size:18px}
+.shield-options button[aria-pressed=true]{background:#14532d;border-color:#4ade80}
+.shield-picker-modifier{padding-top:6px;font-size:11px;color:#86efac}
+.shield-picker .grade-custom button{color:#86efac}
+
+/* Two numbers share the original summary space; the lower controls stay put. */
+.drawer-value-switch{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:5px;align-items:end}
+.drawer-value-button{display:block;min-width:0;text-align:left;padding:2px 0;border-radius:5px;opacity:.65;transition:opacity .18s ease,transform .18s ease}
+.drawer-value-label{display:flex;align-items:center;gap:3px;font-size:10px;line-height:14px;color:#94a3b8;white-space:nowrap}
+.drawer-value-button.is-active{opacity:1;transform:translateY(-1px)}
+.drawer-value-button.is-active .drawer-live-power{text-shadow:0 0 6px currentColor,0 0 15px #ffffff18}
+.drawer-value-button:focus-visible{outline:1px solid #64748b;outline-offset:2px}
+.drawer-value-switch[data-mode=shield] .shield-value-button .drawer-value-label{color:#86efac}
+.shield-base-presets button{color:#86efac}
+.ot-button-style:disabled{opacity:.35;cursor:default}
+
+/* A single soft spectrum matches the drawer's OT treatment. */
+.unit-slot.rainbow-glow .unit-circle{opacity:.8;filter:drop-shadow(0 0 3px #c4b5fd66)}
+.unit-slot.rainbow-glow .unit-circle::before{content:'';position:absolute;inset:9%;border-radius:50%;background:conic-gradient(#fda4af,#fde68a,#86efac,#7dd3fc,#c4b5fd,#fda4af);mask:radial-gradient(circle,transparent 65%,#000 68%,#000 71%,transparent 74%);opacity:.6;animation:ot-ring-breathe 4s ease-in-out infinite}
+.unit-power.rainbow-text{text-shadow:none}
+.unit-power.rainbow-text .power-value{background:none;color:#f1edff;animation:none;filter:none;text-shadow:0 0 5px #c4b5fd55}
+.unit-power.rainbow-text .digit-static,.unit-power.rainbow-text .digit-track>span,.unit-power.rainbow-text .digit-punctuation{background:none;color:inherit;animation:none}
+.trigger-button{--trigger-glow:#c4b5fd}
+.trigger-critical{--trigger-glow:#fde68a}.trigger-draw{--trigger-glow:#fda4af}.trigger-heal{--trigger-glow:#86efac}.trigger-front{--trigger-glow:#f9a8d4}
+.trigger-button .trigger-symbol{filter:drop-shadow(0 1px 1px #020617) drop-shadow(0 0 2px color-mix(in srgb,var(--trigger-glow) 35%,transparent))}
+.trigger-button .trigger-critical-symbol{filter:sepia(.6) saturate(1.8) drop-shadow(0 0 2px #fde68a44)}
+.trigger-button[aria-pressed=true]{background:radial-gradient(circle,#1e293b99,transparent 70%);box-shadow:none}
+.trigger-button[aria-pressed=true] .trigger-symbol{filter:drop-shadow(0 0 4px var(--trigger-glow))}
+@keyframes ot-ring-breathe{50%{opacity:.35}}
+@media(min-width:640px){.turn-open .battle-board{grid-template-rows:minmax(148px,1fr) minmax(148px,1fr) auto}.turn-open .battle-board.has-back-attack{grid-template-rows:minmax(148px,1fr) auto minmax(148px,1fr) auto}}
+@media(max-height:720px) and (max-width:639px){.battle-board,.turn-open .battle-board{grid-template-rows:minmax(134px,1fr) minmax(134px,1fr) auto}.battle-board.has-back-attack,.turn-open .battle-board.has-back-attack{grid-template-rows:minmax(134px,1fr) auto minmax(134px,1fr) auto}.unit-slot{height:134px;grid-template-rows:30px minmax(38px,1fr) 20px 38px}}
+@media(prefers-reduced-motion:reduce){.drawer-value-button{transition:none}.unit-power.rainbow-text .power-value,.unit-slot.rainbow-glow .unit-circle::before{animation:none!important}}
