@@ -114,6 +114,45 @@ async function boot(save, measuredFit = false) {
     await x.click('unit-close'); await x.click('unit-front_left'); assert.equal(Number(x.test('drawer-power').dataset.value), 0);
     assert.ok(!x.d.querySelector('.drawer-live-power [data-rolling]')); await x.escape(); assert.equal(x.d.body.style.overflow, ''); x.done();
 
+    // Attack and shield share controls but never overwrite one another or legacy printed shields.
+    x = await boot({ units:{front_left:{grade:2,basePower:10000,powerBuff:5000,shield:12000,shieldBuff:3000,otActive:true},front_right:{grade:1,basePower:8000,shield:10000}} });
+    assert.equal(x.test('shield-front_left').textContent,'15,000');
+    assert.ok(!x.test('shield-front_right'), 'G1 shield stays off until Intercept is enabled');
+    x.test('shield-front_left').focus(); await x.click('shield-front_left'); assert.ok(x.test('shield-picker')); assert.ok(!x.d.querySelector('.unit-drawer'));
+    x.d.querySelector('[data-shield="20000"]').click(); await wait();
+    assert.equal(x.state().units.front_left.shield,20000); assert.equal(x.state().units.front_left.shieldBuff,3000);
+    assert.ok(x.d.activeElement===x.test('shield-front_left'),'closing shield choices restores focus to its trigger');
+    await x.click('unit-front_left');
+    assert.equal(Number(x.test('drawer-shield').dataset.value),23000); assert.equal(Number(x.test('drawer-power').dataset.value),15000);
+    await x.click('edit-mode-shield'); assert.equal(x.test('edit-mode-shield').getAttribute('aria-pressed'),'true');
+    assert.ok(x.test('unit-ot').disabled, 'shield controls never apply 100 million OT');
+    await x.text('15k',x.test('base-section')); await x.text('+5k',x.test('buff-section'));
+    assert.equal(x.state().units.front_left.shield,15000); assert.equal(x.state().units.front_left.shieldBuff,8000);
+    assert.equal(x.state().units.front_left.powerBuff,5000); assert.equal(x.state().units.front_left.otActive,true);
+    await x.click('edit-buff'); await x.input(x.d.querySelector('#power-edit'),-20000);
+    x.d.querySelector('.inline-power-editor').dispatchEvent(new x.dom.window.Event('submit',{bubbles:true,cancelable:true})); await wait();
+    assert.equal(x.state().units.front_left.shieldBuff,-20000); assert.equal(Number(x.test('drawer-shield').dataset.value),0,'total shield clamps at zero without discarding modifier');
+    await x.click('edit-mode-power'); await x.text('+5k',x.test('buff-section'));
+    assert.equal(x.state().units.front_left.powerBuff,10000); assert.equal(x.state().units.front_left.shieldBuff,-20000);
+    const splitSave=x.state(); x.done(); x=await boot(splitSave); await x.click('unit-front_left');
+    assert.equal(Number(x.test('drawer-shield').dataset.value),0); assert.equal(Number(x.test('drawer-power').dataset.value),20000);
+    await x.click('unit-close'); await x.click('unit-front_right'); await x.click('ability-intercept'); await x.click('unit-close');
+    assert.ok(x.test('shield-front_right'),'manual Intercept reveals G1 shield'); x.done();
+
+    // Grade shortcuts initialize shield; G2 alone enables Intercept automatically.
+    x=await boot({units:{front_left:{basePower:5000,grade:0}}});
+    for(const [grade,shield] of [[0,5000],[1,5000],[2,5000],[3,0]]) {
+        await x.click('grade-front_left'); x.d.querySelector(`[data-grade="${grade}"]`).click(); await wait();
+        assert.equal(x.state().units.front_left.shield,shield); assert.equal(x.state().units.front_left.hasIntercept,grade===2);
+        assert.equal(!!x.test('shield-front_left'),grade===2);
+    }
+    await x.click('unit-front_left'); await x.click('ability-intercept'); await x.click('edit-mode-shield');
+    await x.text('10k',x.test('base-section')); await x.text('+5k',x.test('buff-section')); await x.click('unit-close');
+    await x.click('guard-toggle'); await x.drag('front_left',x.test('guard-circle'));
+    assert.equal(Number(x.test('guard-circle').dataset.value),15000,'Intercept uses base plus shield modifier');
+    await x.click('turn-toggle'); await x.text('回合开始');
+    assert.equal(x.state().units.front_left.shield,10000); assert.equal(x.state().units.front_left.shieldBuff,0,'turn resets temporary shield only'); x.done();
+
     // OT belongs to each unit and preserves unrelated modifiers on rapid toggles.
     x = await boot({ units: { front_center: { basePower:13000,powerBuff:5000,grade:3 }, front_left: { basePower:10000,grade:2 } } });
     await x.click('unit-front_center'); await x.click('unit-ot'); assert.equal(x.state().units.front_center.powerBuff, 100005000);

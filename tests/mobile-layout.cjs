@@ -17,6 +17,17 @@ const demo = { language:'zh', energy:5, units:{front_center:{grade:3,basePower:1
             await page.goto('http://127.0.0.1:4173');
             await page.evaluate(save=>localStorage.setItem('VG_COMBAT_STATE_V20_LOCAL',JSON.stringify(save)),demo);
             await page.reload();await page.getByTestId('unit-front_center').waitFor();await page.evaluate(()=>document.fonts.ready);
+            const closed=await page.locator('.energy-section').boundingBox();
+            assert.ok(900-closed.y-closed.height<=28,'closed guard uses the lower viewport '+JSON.stringify({width,closed}));
+            assert.ok(closed.y+closed.height<=902,'energy stays visible without vertical overflow');
+            await page.screenshot({path:`layout-qa/${width}-guard-closed.png`,fullPage:true});
+            await page.getByTestId('shield-front_left').click();
+            const shieldPicker=await page.getByTestId('shield-picker').boundingBox();
+            assert.ok(shieldPicker.x>=0&&shieldPicker.x+shieldPicker.width<=width,'shield picker stays on-screen');
+            assert.equal(await page.locator('.unit-drawer').count(),0,'shield shortcut does not open the drawer');
+            await page.locator('[data-shield="10000"]').click();
+            assert.equal(await page.getByTestId('shield-front_left').textContent(),'10,000');
+            await page.getByTestId('shield-front_left').click();await page.locator('[data-shield="5000"]').click();
             await page.getByTestId('guard-toggle').click();
             const circle=await page.getByTestId('guard-circle').boundingBox();assert.ok(Math.abs(circle.width/circle.height-2)<.04,'flat elliptical G ring');
             for(const state of ['closed','open']) {
@@ -51,9 +62,27 @@ const demo = { language:'zh', energy:5, units:{front_center:{grade:3,basePower:1
             await page.getByTestId('trigger-over').click();await page.getByTestId('unit-front_center').click();await wait(400);
             assert.equal(await page.getByTestId('unit-front_center').getAttribute('data-value'),'100013000');
             const fit=await page.getByTestId('unit-front_center').locator('.power-value').evaluate(el=>({text:el.getBoundingClientRect().width,box:el.parentElement.getBoundingClientRect().width}));assert.ok(fit.text<=fit.box+1,'OT numeral fits');
-            await page.getByTestId('unit-front_center').click();await page.getByTestId('drawer-power').waitFor();await page.screenshot({path:`layout-qa/${width}-drawer.png`,fullPage:true});await page.getByTestId('unit-close').click();
+            const otColors=await page.getByTestId('unit-front_center').locator('.digit-static,.digit-track>span').evaluateAll(items=>items.map(el=>getComputedStyle(el).color));
+            assert.ok(otColors.every(color=>color==='rgb(241, 237, 255)'),'OT digits remain visible while their reels move');
+            await wait(400);await page.screenshot({path:`layout-qa/${width}-ot-field.png`,fullPage:true});
+            await page.getByTestId('unit-front_center').click();await page.getByTestId('drawer-power').waitFor();await page.screenshot({path:`layout-qa/${width}-drawer.png`,fullPage:true});
+            const oldPower=await page.getByTestId('drawer-power').getAttribute('data-value');
+            await page.getByTestId('edit-mode-shield').click();
+            await page.getByTestId('buff-section').getByRole('button',{name:'+5k',exact:true}).click();
+            assert.equal(await page.getByTestId('drawer-shield').getAttribute('data-value'),'5000');
+            assert.equal(await page.getByTestId('drawer-power').getAttribute('data-value'),oldPower,'shield buttons keep attack unchanged');
+            await wait(400);
+            const values=await page.locator('.drawer-value-button').evaluateAll(items=>items.map(el=>el.getBoundingClientRect().toJSON()));
+            assert.ok(values[0].right<=values[1].left,'attack and shield have separate hit targets');
+            const summary=await page.locator('.drawer-summary').boundingBox();assert.ok(summary.x>=0&&summary.x+summary.width<=width,'drawer values fit narrow screens');
+            await page.screenshot({path:`layout-qa/${width}-shield-drawer.png`,fullPage:true});await page.getByTestId('unit-close').click();
             if(width===1440){await page.getByTestId('settings-edge').click();const settings=await page.locator('.tools-panel').boundingBox();const main=await page.locator('main').boundingBox();assert.ok(settings.x>=main.x+main.width,'settings uses right margin');assert.equal(await page.locator('body').evaluate(el=>el.style.overflow),'');await page.screenshot({path:'layout-qa/1440-settings.png',fullPage:true});}
-            assert.deepEqual(errors,[]);console.log('PASS browser:',width,'G ellipse, rails, icon positions, drag shield, trigger choices, OT width and drawer');await page.close();
+            assert.deepEqual(errors,[]);console.log('PASS browser:',width,'viewport fill, shield picker/switch, G ellipse, rails, drag shield, triggers, readable OT and drawer');await page.close();
         }
+        const shortPage=await browser.newPage({viewport:{width:320,height:640}});
+        await shortPage.goto('http://127.0.0.1:4173');await shortPage.getByTestId('unit-front_center').waitFor();await shortPage.evaluate(()=>document.fonts.ready);
+        const shortEnergy=await shortPage.locator('.energy-section').boundingBox();assert.ok(shortEnergy.y+shortEnergy.height<=642,'EN fits a short 320x640 viewport');
+        assert.ok(640-shortEnergy.y-shortEnergy.height<=28,'short viewport has no unused lower area');
+        await shortPage.screenshot({path:'layout-qa/320-short-closed.png',fullPage:true});await shortPage.close();
     } finally { await browser?.close();server.kill(); }
 })().catch(error=>{console.error(error);process.exitCode=1});

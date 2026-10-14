@@ -8,9 +8,10 @@ A mobile-friendly Cardfight!! Vanguard tabletop counter, with Chinese, Japanese 
 - Open online once and wait for **Ready offline** in Settings. The six-slot counter then works offline, including reopening and saving a game. Browsers and installed home-screen apps may keep separate records; continue a game from the same entry point.
 - An available update appears above the field. **Update & keep my save** applies it when you choose; an ongoing game is never reloaded automatically. The production save key is retained.
 
-- Tap a unit to edit power, modifiers and critical. Its sheet scrolls independently and closes using its top button, backdrop or Escape.
-- Tap the grade badge to set the actual card grade. Grade and power are independent.
-- **Turn Start** stands units and clears temporary power/critical, attack history and shield. It does not Ride or charge energy.
+- Tap a unit, then tap **Power** or the smaller green **Shield** number to choose what the existing base/modifier controls edit. The selected number glows; the two values save independently. OT applies to power. Its sheet scrolls independently and closes using its top button, backdrop or Escape.
+- Tap the grade badge for grade/power/shield shortcuts. G0/G1/G2 start at 5k shield as an editable shortcut; G2 enables Intercept automatically. Set values to match the actual card. Explicit shields from existing saves are retained.
+- An Intercept unit displays shield along the side of its circle. Tap it for common base shields and custom input. Other grades show the badge after Intercept is enabled; the existing back-row override is retained. Intercept contributes base shield plus shield modifier, clamped to zero.
+- **Turn Start** stands units and clears temporary power/shield modifiers, critical, attack history and the guard pool. It does not Ride or charge energy.
 - **Ride next** explicitly advances the Vanguard to the next configured grade/power preset. Use the energy controls at the actual Energy Generator timing; skip the first charge when required by its card text.
 - **OT** toggles an additional 100,000,000 on the selected unit and preserves other modifiers. Apply card-specific additional effects manually.
 - Enter the opponent attack power to calculate guarding. Equal power hits; shield must make defense strictly higher. PG records a no-hit effect independently of shield; cancel restores the counter, while resetting defense ends the recorded battle.
