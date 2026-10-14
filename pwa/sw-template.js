@@ -37,4 +37,5 @@ self.addEventListener('fetch', event => {
 });
 self.addEventListener('message', event => {
     if (event.data?.type === 'APPLY_UPDATE') self.skipWaiting();
+    if (event.data?.type === 'CLAIM_CLIENTS') event.waitUntil(self.clients.claim());
 });

@@ -26,7 +26,9 @@ async function register() {
     watch(registration.installing);
     registration.addEventListener('updatefound', () => watch(registration.installing));
     publish({ update: !!registration.waiting && !!navigator.serviceWorker.controller });
-    await navigator.serviceWorker.ready;
+    const active = await navigator.serviceWorker.ready;
+    // A navigation during the first install can miss the activation's claim.
+    active.active?.postMessage({ type: 'CLAIM_CLIENTS' });
     publish({ ready: true, failed: false });
 }
 export function startPwa() {
