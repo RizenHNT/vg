@@ -1247,7 +1247,7 @@ export default function App() {
 
     const stepUnitGrade = (slot, delta) => {
         const current = stateRef.current.units[slot];
-        modifyUnit(slot, { grade: Math.min(99, Math.max(0, current.grade + delta)) });
+        updateState({ units: { ...stateRef.current.units, [slot]: { ...current, grade: Math.min(99, Math.max(0, current.grade + delta)) } } });
     };
 
     const triggerNames = {

@@ -68,7 +68,7 @@ async function boot(save, measuredFit = false) {
     x.done();
 
     // Quick grades show no duplicate power labels; the stepper preserves card values.
-    x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 10000 }, front_left: { grade: 2, basePower: 11000 } } });
+    x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 10000 }, front_left: { grade: 2, basePower: 11000 }, back_left:{grade:4,basePower:9000,hasBoost:true,isSupporting:false,shield:5000} } });
     x.test('grade-front_center').focus(); await x.click('grade-front_center');
     assert.ok(x.test('grade-picker')); assert.ok(!x.d.querySelector('.unit-drawer'));
     assert.equal(x.test('grade-front_center').textContent, '3');
@@ -84,7 +84,10 @@ async function boot(save, measuredFit = false) {
     for(const key of ['shield','powerBuff','shieldBuff','hasIntercept','hasBoost','hasDoubleStrike','hasTripleStrike'])assert.equal(x.state().units.front_left[key],preserved[key],key+' survives grade stepping');
     assert.equal(x.test('grade-front_left').textContent, '7');
     assert.ok(!x.test('unit-front_left').textContent.includes('G7'));
-    await x.escape(); assert.ok(!x.test('grade-picker')); x.done();
+    await x.escape(); assert.ok(!x.test('grade-picker'));
+    await x.click('grade-back_left');const beforeBack=x.state().units.back_left;
+    await x.click('grade-up');assert.deepEqual({...x.state().units.back_left,grade:beforeBack.grade},beforeBack,'grade step cannot silently enable back-row boost');
+    await x.click('grade-down');assert.deepEqual(x.state().units.back_left,beforeBack);await x.escape();x.done();
 
     // Compact drawer keeps base before modifier; manual entry expands only at the live summary.
     x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 5000 } } });

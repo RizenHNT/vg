@@ -11,7 +11,7 @@ const server = http.createServer((request,response) => {
     if (!file.startsWith(root+path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404); response.end(); return; }
     response.writeHead(200,{'Content-Type':types[path.extname(file)] || 'application/octet-stream','Cache-Control':'no-store'}); response.end(fs.readFileSync(file));
 });
-const seed = {language:'zh',skin:'circuit',energy:5,units:{front_center:{grade:3,basePower:13000,shield:0},front_left:{grade:2,basePower:11000,shield:10000,shieldBuff:2000,hasIntercept:true},front_right:{grade:1,basePower:8000},back_left:{grade:1,basePower:8000},back_center:{grade:1,basePower:8000},back_right:{grade:1,basePower:8000}}};
+const seed = {language:'zh',skin:'circuit',energy:5,units:{front_center:{grade:3,basePower:13000,shield:0},front_left:{grade:2,basePower:11000,shield:10000,shieldBuff:2000,hasIntercept:true},front_right:{grade:1,basePower:8000},back_left:{grade:1,basePower:8000,hasBoost:true,isSupporting:false},back_center:{grade:1,basePower:8000},back_right:{grade:1,basePower:8000}}};
 (async () => {
     fs.mkdirSync('layout-qa',{recursive:true});
     await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
@@ -35,6 +35,8 @@ const seed = {language:'zh',skin:'circuit',energy:5,units:{front_center:{grade:3
         await page.getByTestId('grade-down').click(); assert.equal((await state()).units.front_left.grade,10);
         await page.screenshot({path:'layout-qa/grade-stepper.png'});
         await page.keyboard.press('Escape');
+        await page.getByTestId('grade-back_left').click();const rearBefore=(await state()).units.back_left;
+        for(let i=0;i<4;i++)await page.getByTestId('grade-up').click();assert.deepEqual({...((await state()).units.back_left),grade:rearBefore.grade},rearBefore,'rear grade step cannot silently enable boost');await page.keyboard.press('Escape');
         for(const [slot,power] of [['front_left',5000],['front_center',6000]]) {
             await page.getByTestId('grade-'+slot).click(); await page.locator('[data-grade="0"]').tap();
             assert.equal((await state()).units[slot].basePower,power); assert.equal(await page.getByTestId('grade-picker').count(),0);

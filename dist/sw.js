@@ -1,6 +1,6 @@
 const CACHE_PREFIX = 'vg-counter-shell-';
-const CACHE_NAME = CACHE_PREFIX + "c9c649692b703b4a";
-const PRECACHE = ["/index.html","/assets/index-B11PnIdy.js","/assets/index-BpJOEqdt.css","/manifest.webmanifest","/icons/app-192.png","/icons/app-512.png","/icons/app-maskable-512.png","/icons/apple-touch-icon.png","/fonts/barlow-condensed-600.ttf","/fonts/barlow-condensed-800.ttf","/field-circuit-blue.svg","/field-circuit-gold.svg","/field-circuit-guard.svg","/symbols/vg-tech-atlas.png","/reference-playmat.jpg"];
+const CACHE_NAME = CACHE_PREFIX + "cfabda7064139e03";
+const PRECACHE = ["/index.html","/assets/index-BpJOEqdt.css","/assets/index-DCOSYRU5.js","/manifest.webmanifest","/icons/app-192.png","/icons/app-512.png","/icons/app-maskable-512.png","/icons/apple-touch-icon.png","/fonts/barlow-condensed-600.ttf","/fonts/barlow-condensed-800.ttf","/field-circuit-blue.svg","/field-circuit-gold.svg","/field-circuit-guard.svg","/symbols/vg-tech-atlas.png","/reference-playmat.jpg"];
 const KNOWN_ASSETS = new Set(PRECACHE);
 
 self.addEventListener('install', event => {
