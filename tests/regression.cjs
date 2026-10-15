@@ -67,21 +67,27 @@ async function boot(save, measuredFit = false) {
     assert.ok(numeral.getBoundingClientRect().width <= 68, 'fitted numeral ' + JSON.stringify({font:numeral.style.fontSize,width:numeral.getBoundingClientRect().width,paddingLeft:x.dom.window.getComputedStyle(numeral.parentElement).paddingLeft,paddingRight:x.dom.window.getComputedStyle(numeral.parentElement).paddingRight}));
     x.done();
 
-    // Main grade click opens quick choices and custom input, never a unit drawer.
-    x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 10000 }, front_left: { grade: 2, basePower: 11000 } } });
+    // Quick grades show no duplicate power labels; the stepper preserves card values.
+    x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 10000 }, front_left: { grade: 2, basePower: 11000 }, back_left:{grade:4,basePower:9000,hasBoost:true,isSupporting:false,shield:5000} } });
     x.test('grade-front_center').focus(); await x.click('grade-front_center');
     assert.ok(x.test('grade-picker')); assert.ok(!x.d.querySelector('.unit-drawer'));
     assert.equal(x.test('grade-front_center').textContent, '3');
-    assert.equal(x.d.querySelector('.grade-options button[data-grade="4"]').textContent, '428,000');
+    assert.deepEqual([...x.d.querySelectorAll('.grade-options button')].map(b=>b.textContent),['0','1','2','3','4','10','11']);
+    assert.ok(!x.test('grade-zero-options'));
     x.d.querySelector('[data-grade="4"]').click(); await wait();
     assert.equal(x.state().units.front_center.grade, 4); assert.equal(x.state().units.front_center.basePower, 28000); assert.equal(x.state().units.front_center.powerBuff, 10000);
     assert.equal(x.d.activeElement, x.test('grade-front_center'));
-    await x.click('grade-front_left'); await x.input(x.d.querySelector('.grade-custom input'), 7);
-    x.d.querySelector('.grade-custom').dispatchEvent(new x.dom.window.Event('submit', { bubbles: true, cancelable: true })); await wait();
+    await x.click('grade-front_left');
+    const preserved=x.state().units.front_left;
+    for(let i=0;i<5;i++)await x.click('grade-up');
     assert.equal(x.state().units.front_left.grade, 7); assert.equal(x.state().units.front_left.basePower, 11000, 'rear printed power is independent of grade');
+    for(const key of ['shield','powerBuff','shieldBuff','hasIntercept','hasBoost','hasDoubleStrike','hasTripleStrike'])assert.equal(x.state().units.front_left[key],preserved[key],key+' survives grade stepping');
     assert.equal(x.test('grade-front_left').textContent, '7');
     assert.ok(!x.test('unit-front_left').textContent.includes('G7'));
-    await x.click('grade-front_left'); await x.escape(); assert.ok(!x.test('grade-picker')); x.done();
+    await x.escape(); assert.ok(!x.test('grade-picker'));
+    await x.click('grade-back_left');const beforeBack=x.state().units.back_left;
+    await x.click('grade-up');assert.deepEqual({...x.state().units.back_left,grade:beforeBack.grade},beforeBack,'grade step cannot silently enable back-row boost');
+    await x.click('grade-down');assert.deepEqual(x.state().units.back_left,beforeBack);await x.escape();x.done();
 
     // Compact drawer keeps base before modifier; manual entry expands only at the live summary.
     x = await boot({ units: { front_center: { grade: 3, basePower: 13000, powerBuff: 5000 } } });
@@ -315,7 +321,7 @@ async function boot(save, measuredFit = false) {
     await x.guard(); await x.text('取消', x.d.querySelector('.guard-drawer')); assert.equal(x.state().units.back_left.basePower, 10000);
     assert.equal(Number(x.test('guard-circle').dataset.value), 0); x.done();
 
-    // R grade shortcuts bind printed power too, with explicit 5k/6k G0 options.
+    // R G0 defaults to 5k; alternate G0 power is hidden behind long press / keyboard.
     x = await boot({units:{front_left:{grade:0,basePower:0}}});
     for (const [grade,power] of [[1,8000],[2,10000],[3,13000],[4,28000],[0,5000]]) {
         await x.click('grade-front_left'); x.d.querySelector('[data-grade="'+grade+'"]').click(); await wait();
@@ -323,7 +329,8 @@ async function boot(save, measuredFit = false) {
         assert.equal(x.state().units.front_left.hasBoost,grade<=1); assert.equal(x.state().units.front_left.hasDoubleStrike,false);
         assert.equal(x.state().units.front_left.hasTripleStrike,false);
     }
-    await x.click('grade-front_left'); x.d.querySelectorAll('.rear-zero-options button')[1].click(); await wait();
+    await x.click('grade-front_left'); x.d.querySelector('[data-grade="0"]').dispatchEvent(new x.dom.window.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));await wait();
+    x.d.querySelector('[data-zero-power="6000"]').click(); await wait();
     assert.equal(x.state().units.front_left.grade,0); assert.equal(x.state().units.front_left.basePower,6000);
     await x.click('grade-front_left'); x.d.querySelector('[data-grade="2"]').click(); await wait();
     assert.ok(x.test('unit-front_left').querySelector('.slot-abilities .symbol-intercept'));

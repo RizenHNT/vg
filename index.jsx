@@ -1,6 +1,9 @@
 import './styles.css';
 import './drawer-enhancements.css';
 import './match-upgrade.css';
+import './ring-design.css';
+import GradePicker from './GradePicker.jsx';
+import { FieldRing } from './RingArt.jsx';
 import { AppearanceControls, CombatEffect, MatchPanel, MatchResetDialog, RizenSecret } from './MatchTools.jsx';
 import { MATCH_COPY } from './match-copy.js';
 import { SKINS, freshMatch, normalizeMatch, addMatchEvent, pauseMatch, toggleMatchTimer } from './match-state.js';
@@ -559,43 +562,6 @@ function TriggerSymbol({ kind }) {
             <text x="48" y="71" className="trigger-kanji" textAnchor="middle" fill={'url(#' + gradient + ')'} stroke="#e6ce78" strokeWidth=".8" paintOrder="stroke">{TRIGGER_GLYPHS[kind]}</text>
         </g>
     </svg>;
-}
-
-function GradePicker({ slot, unit, anchor, t, onSelect, onClose }) {
-    const [custom, setCustom] = useState(String(unit.grade));
-    const [customPower, setCustomPower] = useState('');
-    const dialogRef = useRef(null);
-    useEffect(() => {
-        const previousFocus = document.activeElement;
-        (dialogRef.current?.querySelector('button[data-grade="' + unit.grade + '"]') || dialogRef.current?.querySelector('input'))?.focus();
-        const outside = event => {
-            if (!dialogRef.current?.contains(event.target) && !event.target.closest?.('[data-grade-toggle]')) onClose();
-        };
-        document.addEventListener('pointerdown', outside);
-        const escape = event => {
-            if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); onClose(); }
-            if (event.key === 'Tab') {
-                const controls = [...(dialogRef.current?.querySelectorAll('button,input') || [])];
-                const first = controls[0], last = controls[controls.length - 1];
-                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-            }
-        };
-        document.addEventListener('keydown', escape, true);
-        return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); previousFocus?.focus(); };
-    }, []);
-    const apply = (value, power) => { if (value !== '' && Number.isFinite(Number(value)) && (power === undefined || Number.isFinite(Number(power)))) { onSelect(slot, value, power); onClose(); } };
-    const width = Math.min(228, window.innerWidth - 16);
-    const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8));
-    const top = Math.max(8, Math.min(anchor.bottom + 4, window.innerHeight - 356));
-    return <div ref={dialogRef} role="dialog" aria-label={t.edit_grade} className="grade-picker" style={{ left, top, width }} data-testid="grade-picker" onClick={e => e.stopPropagation()}>
-        <div className="grade-picker-heading"><span>{t.edit_grade}</span><button type="button" aria-label={t.close} onClick={onClose}><X size={16} /></button></div>
-        <div className="grade-options">{[0, 1, 2, 3, 4].map(grade => <button type="button" key={grade} data-grade={grade} aria-pressed={unit.grade === grade} onClick={() => apply(grade)}><b>{grade}</b><span>{formatNumber(grade === 0 && slot !== 'front_center' ? REAR_GRADE_ZERO_POWER : GRADE_PRESETS[grade] ?? DEFAULT_GRADE_PRESETS[grade])}</span></button>)}</div>
-        <div className="special-grade-options"><span>{t.special_units}</span>{SPECIAL_UNIT_PRESETS.map(preset=><button type="button" key={preset.grade} data-grade={preset.grade} aria-pressed={unit.grade===preset.grade} onClick={()=>apply(preset.grade,preset.power)}><b>G{preset.grade}</b><span>{t[preset.name]} · {preset.power/1000}k</span></button>)}</div>
-        {slot !== 'front_center' && <div className="rear-zero-options">{[5000, 6000].map(power => <button type="button" key={power} onClick={() => { onSelect(slot, 0, power); onClose(); }}>0 · {formatNumber(power)}</button>)}</div>}
-        <form className="grade-custom" onSubmit={e => { e.preventDefault(); apply(custom, customPower==='' ? undefined : Math.max(0,Number(customPower))); }}><input type="number" min="0" max="99" inputMode="numeric" aria-label={t.custom_grade} value={custom} onChange={e => setCustom(e.target.value)} /><button type="submit">{t.set_base}</button><input className="custom-grade-power" type="number" min="0" inputMode="numeric" aria-label={t.custom_power} placeholder={t.custom_power} value={customPower} onChange={e=>setCustomPower(e.target.value)}/></form>
-        <p className="special-grade-note">{t.special_note}</p>
-    </div>;
 }
 
 function ShieldPicker({ slot, unit, anchor, t, onSelect, onClose }) {
@@ -1279,6 +1245,11 @@ export default function App() {
             ...(power !== undefined ? { basePower: power, isStriding: false, heart: null } : {}) },{kind:isVanguard?'ride':'call',slot,value:power ?? stateRef.current.units[slot].basePower});
     };
 
+    const stepUnitGrade = (slot, delta) => {
+        const current = stateRef.current.units[slot];
+        updateState({ units: { ...stateRef.current.units, [slot]: { ...current, grade: Math.min(99, Math.max(0, current.grade + delta)) } } });
+    };
+
     const triggerNames = {
         zh: { critical: '暴击触发', draw: '抽牌触发', front: '前列触发', heal: '治疗触发', over: '超触发', power: '选择力量对象', crit: '选择暴击对象', cancel: '撤销触发' },
         en: { critical: 'Critical trigger', draw: 'Draw trigger', front: 'Front trigger', heal: 'Heal trigger', over: 'Over trigger', power: 'Choose power target', crit: 'Choose critical target', cancel: 'Undo trigger' },
@@ -1410,7 +1381,7 @@ export default function App() {
             onTouchStart={e => { if (e.target.closest('button,input') || e.touches.length !== 1) return; const point = e.touches[0]; startHold(id, point.clientX, point.clientY); }}
             onContextMenu={e => e.preventDefault()}
             className={'unit-slot relative rounded-lg border-2 select-none ' + border + ' ' + tone + (unit.otActive ? ' rainbow-glow' : '') + (reserved ? ' unit-reserved' : '') + (triggerFlash && id.startsWith('front') && isTriggerTarget(id, gameState) ? ' trigger-flash' : '')}>
-            <span aria-hidden="true" className={'unit-circle ' + (isVanguardSlot ? 'circle-vanguard' : 'circle-rearguard')} />
+            <FieldRing skin={gameState.skin} vanguard={isVanguardSlot}/>
             {combatEffects.filter(effect=>effect.slots.includes(id)).map(effect=><CombatEffect key={effect.id} effect={effect} t={t}/>)}
             <div className="slot-topline">
                 <div className="slot-abilities">
@@ -1674,7 +1645,7 @@ export default function App() {
                 </div>
             )}
             {selectedSlot === 'guard' && renderGuardDrawer()}
-            {gradeEditor && <GradePicker key={gradeEditor.slot} slot={gradeEditor.slot} unit={gameState.units[gradeEditor.slot]} anchor={gradeEditor.anchor} t={t} onSelect={setUnitGrade} onClose={() => setGradeEditor(null)} />}
+            {gradeEditor && <GradePicker key={gradeEditor.slot} slot={gradeEditor.slot} unit={gameState.units[gradeEditor.slot]} anchor={gradeEditor.anchor} t={t} onSelect={setUnitGrade} onStep={stepUnitGrade} onClose={() => setGradeEditor(null)} />}
             {shieldEditor && <ShieldPicker key={shieldEditor.slot} slot={shieldEditor.slot} unit={gameState.units[shieldEditor.slot]} anchor={shieldEditor.anchor} t={t} onSelect={(slot, shield) => modifyUnit(slot, { shield })} onClose={() => setShieldEditor(null)} />}
             {matchDialog && <MatchResetDialog key={matchDialog} mode={matchDialog} t={t} onClose={()=>setMatchDialog(null)} onConfirm={confirmMatchAction}/>}
             {secretOpen && <RizenSecret t={t} onClose={()=>setSecretOpen(false)}/>}
