@@ -7,6 +7,8 @@ let js=fs.readFileSync('dist/'+jsPath,'utf8');let css=fs.readFileSync('dist/'+cs
 const assets={ '/fonts/barlow-condensed-800.ttf':['public/fonts/barlow-condensed-800.ttf','font/ttf'], '/fonts/barlow-condensed-600.ttf':['public/fonts/barlow-condensed-600.ttf','font/ttf'], '/reference-playmat.jpg':['public/reference-playmat.jpg','image/jpeg'], '/field-circuit-blue.svg':['public/field-circuit-blue.svg','image/svg+xml'], '/field-circuit-gold.svg':['public/field-circuit-gold.svg','image/svg+xml']};
 assets['/symbols/vg-tech-atlas.png']=['public/symbols/vg-tech-atlas.png','image/png'];
 assets['/field-circuit-guard.svg']=['public/field-circuit-guard.svg','image/svg+xml'];
+assets['/skins/dragon-sanctuary.webp']=['public/skins/dragon-sanctuary.webp','image/webp'];
+assets['/skins/moon-grove.webp']=['public/skins/moon-grove.webp','image/webp'];
 for(const [url,[path,mime]] of Object.entries(assets)){const data=inline && ['/symbols/vg-tech-atlas.png','/reference-playmat.jpg'].includes(url) ? 'https://cdn.jsdelivr.net/gh/RizenHNT/vg@27af5a9/'+path : 'data:'+mime+';base64,'+fs.readFileSync(path).toString('base64');js=js.replaceAll(url,data);css=css.replaceAll(url,data);}
 const preloadEnd=js.indexOf('})();');if(preloadEnd<0)throw Error('Missing Vite preload wrapper');js=js.slice(preloadEnd+5);
 js=js.replaceAll('localStorage.getItem','reviewStorage.getItem').replaceAll('localStorage.setItem','reviewStorage.setItem');

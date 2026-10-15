@@ -1,6 +1,6 @@
 const CACHE_PREFIX = 'vg-counter-shell-';
-const CACHE_NAME = CACHE_PREFIX + "cfabda7064139e03";
-const PRECACHE = ["/index.html","/assets/index-BpJOEqdt.css","/assets/index-DCOSYRU5.js","/manifest.webmanifest","/icons/app-192.png","/icons/app-512.png","/icons/app-maskable-512.png","/icons/apple-touch-icon.png","/fonts/barlow-condensed-600.ttf","/fonts/barlow-condensed-800.ttf","/field-circuit-blue.svg","/field-circuit-gold.svg","/field-circuit-guard.svg","/symbols/vg-tech-atlas.png","/reference-playmat.jpg"];
+const CACHE_NAME = CACHE_PREFIX + "a023f4c88d15ec8b";
+const PRECACHE = ["/index.html","/play.html","/assets/index-Be-nkldz.js","/assets/index-D9gfHKiv.css","/manifest.webmanifest","/icons/app-192.png","/icons/app-512.png","/icons/app-maskable-512.png","/icons/apple-touch-icon.png","/fonts/barlow-condensed-600.ttf","/fonts/barlow-condensed-800.ttf","/field-circuit-blue.svg","/field-circuit-gold.svg","/field-circuit-guard.svg","/symbols/vg-tech-atlas.png","/reference-playmat.jpg","/skins/dragon-sanctuary.webp","/skins/moon-grove.webp"];
 const KNOWN_ASSETS = new Set(PRECACHE);
 
 self.addEventListener('install', event => {
@@ -28,7 +28,7 @@ self.addEventListener('fetch', event => {
     const request = event.request;
     const url = new URL(request.url);
     if (request.method !== 'GET' || url.origin !== self.location.origin) return;
-    if (request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/index.html')) {
+    if (request.mode === 'navigate' && ['/', '/index.html', '/play.html'].includes(url.pathname)) {
         // The shell and its versioned assets stay together until the update is accepted.
         event.respondWith(cachedAsset('/index.html').then(found => found || fetch(request)));
     } else if (KNOWN_ASSETS.has(url.pathname) || /^\/assets\/[^/]+\.(js|css)$/.test(url.pathname)) {

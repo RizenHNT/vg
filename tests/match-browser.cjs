@@ -29,8 +29,8 @@ const seed={language:'zh',skin:'ember',energy:7,resources:{soul:6,damage:3,shiel
         await page.getByTestId('grade-front_center').click();await page.locator('[data-grade="11"]').click();
         save=await state();assert.equal(save.units.front_center.grade,11);assert.equal(save.units.front_center.basePower,18000);assert.equal(save.units.front_center.hasDoubleStrike,true);assert.equal(save.units.front_center.hasTripleStrike,false);assert.equal(save.units.front_center.isStriding,false);
         await page.getByTestId('grade-front_right').click();await page.locator('[data-grade="2"]').click();
-        await page.getByTestId('unit-front_right').locator('[data-testid=fx-call]').waitFor();await pause(120);await page.screenshot({path:'layout-qa/match-call.png',fullPage:true});
-        await page.getByTestId('attack-front_center').click();await page.getByTestId('unit-front_center').locator('[data-testid=fx-attack]').waitFor();await pause(120);await page.screenshot({path:'layout-qa/match-attack.png',fullPage:true});
+        await page.locator('[data-effect-slot="front_right"] [data-testid=fx-call]').waitFor();await pause(120);await page.screenshot({path:'layout-qa/match-call.png',fullPage:true});
+        await page.getByTestId('attack-front_center').click();await page.locator('[data-effect-slot="front_center"] [data-testid=fx-attack]').waitFor();await pause(120);await page.screenshot({path:'layout-qa/match-attack.png',fullPage:true});
         save=await state();assert.equal(save.attackCount,1);assert.equal(save.attackHistory.length,1);assert.ok(save.match.events.some(event=>event.kind==='attack'));
         await page.getByTestId('timer-toggle').click();await pause(1150);await page.getByTestId('timer-toggle').click();
         save=await state();assert.ok(save.match.elapsedMs>=121000);assert.equal(save.match.runningSince,null);

@@ -3,6 +3,7 @@ const listeners = new Set();
 let registration;
 let started = false;
 let reloadAfterUpdate = false;
+let lastCheck = 0;
 
 export const getPwaStatus = () => status;
 export function subscribePwa(listener) {
@@ -38,6 +39,8 @@ async function register() {
     }
     const current = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
     watchRegistration(current);
+    // register() can reuse an existing worker; explicitly fetch its current source.
+    current.update().catch(() => {});
     const active = await navigator.serviceWorker.ready;
     // A navigation during the first install can miss the activation's claim.
     active.active?.postMessage({ type: 'CLAIM_CLIENTS' });
@@ -58,6 +61,20 @@ export function startPwa() {
         if (registration && status.ready) registration.update().catch(() => {});
         else register().catch(() => { if (!status.ready) publish({ failed: true }); });
     });
+    const recheck = () => { if (document.visibilityState === 'visible') checkPwaUpdate(); };
+    document.addEventListener('visibilitychange', recheck);
+    window.addEventListener('focus', recheck);
+}
+export async function checkPwaUpdate(force = false) {
+    if (navigator.onLine === false || (!force && Date.now() - lastCheck < 60000)) return;
+    lastCheck = Date.now();
+    try {
+        const current = registration || await navigator.serviceWorker.getRegistration('/');
+        if (!current) return;
+        if (current !== registration) watchRegistration(current);
+        await current.update();
+        publish({ update: !!current.waiting && !!navigator.serviceWorker.controller });
+    } catch { /* A failed update must not interrupt an offline game. */ }
 }
 export function applyPwaUpdate() {
     if (!registration?.waiting) return;

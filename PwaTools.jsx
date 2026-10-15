@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Download, Share2, Check, WifiOff, RefreshCcw } from 'lucide-react';
-import { applyPwaUpdate, getPwaStatus, subscribePwa } from './pwa-runtime.js';
+import { applyPwaUpdate, checkPwaUpdate, getPwaStatus, subscribePwa } from './pwa-runtime.js';
 import './pwa.css';
 
 const URL = 'https://vg-counter.vercel.app/';
@@ -30,6 +30,8 @@ export function PwaTools({ language }) {
     const [message, setMessage] = useState('');
     const [manualLink, setManualLink] = useState(false);
     const [online, setOnline] = useState(navigator.onLine !== false);
+    const [checking,setChecking] = useState(false);
+    const checkLabel = {zh:'检查更新',en:'Check for updates',ja:'更新を確認'}[language] || '检查更新';
     useEffect(() => {
         // The runtime retains a prompt fired before this settings panel opened.
         const prompt = event => { event.preventDefault(); window.vgInstallPrompt = event; setInstallPrompt(event); };
@@ -64,6 +66,7 @@ export function PwaTools({ language }) {
             <button type="button" data-testid="pwa-share" onClick={share}><Share2 size={15} />{t.share}</button>
         </div>
         <p className="pwa-offline" data-testid="pwa-offline" data-ready={status.ready} role="status">{status.ready ? online ? <Check size={13} /> : <WifiOff size={13} /> : null}{readyText}</p>
+        <button type="button" className="pwa-check-update" data-testid="pwa-check-update" disabled={checking || !online} onClick={async()=>{setChecking(true);try{await checkPwaUpdate(true);}finally{setChecking(false);}}}><RefreshCcw size={12}/>{checkLabel}</button>
         {message && <p className="pwa-feedback" role="status">{t[message]}</p>}
         {manualLink && <label className="pwa-link">{t.link}<input readOnly value={URL} onFocus={e => e.target.select()} /></label>}
         <details data-testid="pwa-help" open={helpOpen} onToggle={event => setHelpOpen(event.currentTarget.open)}>

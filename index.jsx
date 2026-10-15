@@ -2,9 +2,11 @@ import './styles.css';
 import './drawer-enhancements.css';
 import './match-upgrade.css';
 import './ring-design.css';
+import './summon-art.css';
+import { BattleSpells } from './SpellArt.jsx';
 import GradePicker from './GradePicker.jsx';
 import { FieldRing } from './RingArt.jsx';
-import { AppearanceControls, CombatEffect, MatchPanel, MatchResetDialog, RizenSecret } from './MatchTools.jsx';
+import { AppearanceControls, MatchPanel, MatchResetDialog, RizenSecret } from './MatchTools.jsx';
 import { MATCH_COPY } from './match-copy.js';
 import { SKINS, freshMatch, normalizeMatch, addMatchEvent, pauseMatch, toggleMatchTimer } from './match-state.js';
 import { PwaTools, PwaUpdateNotice } from './PwaTools.jsx';
@@ -776,7 +778,7 @@ export default function App() {
         if (!stateRef.current.effects || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
         const id=++effectSerial.current;
         setCombatEffects(previous=>[...previous.slice(-5),{id,kind,slots}]);
-        const timer=setTimeout(()=>{setCombatEffects(previous=>previous.filter(effect=>effect.id!==id));effectTimers.current.delete(timer);},950);
+        const timer=setTimeout(()=>{setCombatEffects(previous=>previous.filter(effect=>effect.id!==id));effectTimers.current.delete(timer);},1650);
         effectTimers.current.add(timer);
     };
     const closePanels = () => {
@@ -1382,7 +1384,6 @@ export default function App() {
             onContextMenu={e => e.preventDefault()}
             className={'unit-slot relative rounded-lg border-2 select-none ' + border + ' ' + tone + (unit.otActive ? ' rainbow-glow' : '') + (reserved ? ' unit-reserved' : '') + (triggerFlash && id.startsWith('front') && isTriggerTarget(id, gameState) ? ' trigger-flash' : '')}>
             <FieldRing skin={gameState.skin} vanguard={isVanguardSlot}/>
-            {combatEffects.filter(effect=>effect.slots.includes(id)).map(effect=><CombatEffect key={effect.id} effect={effect} t={t}/>)}
             <div className="slot-topline">
                 <div className="slot-abilities">
                     {(unit.hasIntercept || (id.startsWith('back') && gameState.allowBackIntercept && power !== 0)) && <span title={t.intercept}><OfficialSymbol kind="intercept" /></span>}
@@ -1568,6 +1569,7 @@ export default function App() {
             <main className="battle-main p-3 max-w-md mx-auto">
                 {showGuard && <section id="guard-circle-area">{renderGuardCircle()}</section>}
                 <section className="field-section">
+                    <BattleSpells effects={gameState.effects ? combatEffects : []} units={gameState.units} t={t}/>
                     {gameState.isMultiSupportMode && <div className="support-choice" role="status"><span>{actionCopy.choose_support} · {gameState.supportSlots.length}</span><button type="button" data-testid="support-cancel" aria-label={actionCopy.cancel_support} onClick={cancelFreeSupport}><X size={14} /></button></div>}
                     <div className={'battle-board grid grid-cols-3 gap-2' + (hasBackRowAttack ? ' has-back-attack' : '')}>
                         {columns.map(column => renderUnitSlot(`front_${column}`, column === 'center' ? t.vanguard : column === 'left' ? t.front_l : t.front_r))}
