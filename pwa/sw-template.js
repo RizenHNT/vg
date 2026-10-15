@@ -28,7 +28,7 @@ self.addEventListener('fetch', event => {
     const request = event.request;
     const url = new URL(request.url);
     if (request.method !== 'GET' || url.origin !== self.location.origin) return;
-    if (request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/index.html')) {
+    if (request.mode === 'navigate' && ['/', '/index.html', '/play.html'].includes(url.pathname)) {
         // The shell and its versioned assets stay together until the update is accepted.
         event.respondWith(cachedAsset('/index.html').then(found => found || fetch(request)));
     } else if (KNOWN_ASSETS.has(url.pathname) || /^\/assets\/[^/]+\.(js|css)$/.test(url.pathname)) {

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Clock3, Pause, Play, RotateCcw, Sparkles, X } from 'lucide-react';
 import { elapsedMatch, formatDuration, SKINS } from './match-state.js';
 import { RingArt } from './RingArt.jsx';
+import { NeonOrbit, SummonSequence } from './SpellArt.jsx';
 
 function useDialogFocus(ref, onClose) {
     const closeRef=useRef(onClose);closeRef.current=onClose;
@@ -52,19 +53,24 @@ export function MatchResetDialog({ mode, t, onClose, onConfirm }) {
 }
 
 export function AppearanceControls({ skin, effects, t, onSkin, onEffects }) {
+    const [preview,setPreview]=useState(false);
     return <section className="appearance-controls" aria-label={t.appearance}>
         <h3><Sparkles size={13}/>{t.appearance}</h3>
         <div className="skin-options">{SKINS.map(name=><button type="button" key={name} data-testid={'skin-'+name} data-swatch={name} aria-pressed={skin===name} onClick={()=>onSkin(name)}><span className="skin-preview" aria-hidden="true"><RingArt skin={name}/><b>13,000</b><span className="skin-preview-track"/></span><span>{t['skin_'+name]}</span><small>{t['skin_detail_'+name]}</small></button>)}</div>
         <label className="effects-toggle"><input type="checkbox" data-testid="effects-toggle" checked={effects} onChange={event=>onEffects(event.target.checked)}/><span>{t.effects_toggle}</span></label>
         <p>{t.effects_note}</p>
+        <button type="button" className="effect-preview-button" data-testid="effect-preview" onClick={()=>setPreview(true)}><Sparkles size={14}/>{t.preview_effects}</button>
+        {preview&&<EffectPreview t={t} onClose={()=>setPreview(false)}/>}
     </section>;
 }
 
-export function CombatEffect({ effect, t }) {
-    return <span className={'combat-effect fx-'+effect.kind} aria-hidden="true" data-testid={'fx-'+effect.kind}>
-        <i className="fx-orbit"/><i className="fx-orbit fx-orbit-second"/><i className="fx-sweep"/>
-        <span className="fx-caption">{t['event_'+effect.kind] || t.ot}</span>
-    </span>;
+function EffectPreview({t,onClose}) {
+    const ref=useRef(null),[scene,setScene]=useState({kind:'over',serial:0});useDialogFocus(ref,onClose);
+    return <div className="match-modal-backdrop effect-preview-backdrop" onClick={onClose}><section ref={ref} className="effect-preview-dialog" role="dialog" aria-modal="true" aria-label={t.preview_effects} onClick={e=>e.stopPropagation()} data-testid="effect-preview-dialog">
+        <div className="match-confirm-heading"><h2>{t.preview_effects}</h2><button type="button" data-safe-cancel aria-label={t.close} onClick={onClose}><X size={18}/></button></div>
+        <div className={'spell-demo demo-'+scene.kind} data-testid="spell-demo"><span className="demo-ring"><RingArt skin="circuit"/></span>{scene.kind==='over'&&<NeonOrbit/>}<SummonSequence key={scene.serial} effect={scene} t={t}/><b>{scene.kind==='over'?'100,013,000':'13,000'}</b></div>
+        <div className="effect-preview-tabs">{['over','call','attack'].map(kind=><button type="button" key={kind} aria-pressed={scene.kind===kind} data-testid={'preview-'+kind} onClick={()=>setScene(current=>({kind,serial:current.serial+1}))}>{kind==='over'?'OT':t['event_'+kind]}</button>)}</div><p>{t.preview_note}</p>
+    </section></div>;
 }
 
 export function RizenSecret({ t, onClose }) {
