@@ -22,6 +22,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node tests/mobile-layout.cjs
       - run: node tests/match-browser.cjs
+      - run: node tests/ring-browser.cjs
       - run: node tests/pwa-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()

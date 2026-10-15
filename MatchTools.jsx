@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Clock3, Pause, Play, RotateCcw, Sparkles, X } from 'lucide-react';
 import { elapsedMatch, formatDuration, SKINS } from './match-state.js';
+import { RingArt } from './RingArt.jsx';
 
 function useDialogFocus(ref, onClose) {
     const closeRef=useRef(onClose);closeRef.current=onClose;
@@ -53,7 +54,7 @@ export function MatchResetDialog({ mode, t, onClose, onConfirm }) {
 export function AppearanceControls({ skin, effects, t, onSkin, onEffects }) {
     return <section className="appearance-controls" aria-label={t.appearance}>
         <h3><Sparkles size={13}/>{t.appearance}</h3>
-        <div className="skin-options">{SKINS.map(name=><button type="button" key={name} data-testid={'skin-'+name} data-swatch={name} aria-pressed={skin===name} onClick={()=>onSkin(name)}><i aria-hidden="true"/><span>{t['skin_'+name]}</span></button>)}</div>
+        <div className="skin-options">{SKINS.map(name=><button type="button" key={name} data-testid={'skin-'+name} data-swatch={name} aria-pressed={skin===name} onClick={()=>onSkin(name)}><span className="skin-preview" aria-hidden="true"><RingArt skin={name}/><b>13,000</b><span className="skin-preview-track"/></span><span>{t['skin_'+name]}</span><small>{t['skin_detail_'+name]}</small></button>)}</div>
         <label className="effects-toggle"><input type="checkbox" data-testid="effects-toggle" checked={effects} onChange={event=>onEffects(event.target.checked)}/><span>{t.effects_toggle}</span></label>
         <p>{t.effects_note}</p>
     </section>;

@@ -1,0 +1,100 @@
+/* Shared artwork, independent motion layers: numbers never rotate with the ring. */
+.vg-app{--skin-line:#304663;--skin-panel:#0a1528;--skin-light:#8cddff;--skin-radius:10px}
+.vg-app .unit-slot .unit-circle{background:none;--ring-source:url('/field-circuit-gold.svg');--ring-ink:#dfc773;--ring-muted:#8d7942;opacity:.7;filter:drop-shadow(0 0 3px #b49a3533)}
+.vg-app .unit-slot .circle-vanguard{--ring-source:url('/field-circuit-blue.svg');--ring-ink:#80d7ff;--ring-muted:#397da4;opacity:.84;filter:drop-shadow(0 0 4px #38bdf855)}
+.vg-app .unit-slot .unit-circle::before,.vg-app .unit-slot .unit-circle::after{content:none;animation:none}
+.circle-art,.circle-unfold,.circle-spectrum{position:absolute;inset:0;display:block;transform-origin:center;pointer-events:none}
+.ring-engraving{display:block;position:absolute;inset:0;width:100%;height:100%;stroke:var(--ring-ink,#80d7ff);stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+.ring-circuit{background:var(--ring-source,url('/field-circuit-blue.svg')) center/contain no-repeat}
+.ring-secondary{stroke:var(--ring-muted,#397da4);stroke-width:.75}
+.ring-filled{fill:var(--ring-ink,#80d7ff);stroke:none}
+.circle-unfold,.circle-spectrum{display:none}
+.vg-app .unit-slot[data-selection=true] .unit-circle{opacity:1;filter:drop-shadow(0 0 5px var(--ring-ink))}
+.vg-app .unit-slot[data-rested=true]:not([data-selection=true]) .unit-circle{opacity:.22;filter:none}
+.unit-slot:not([data-rested=true]) .unit-power .power-value{filter:drop-shadow(0 0 3px currentColor) drop-shadow(0 0 10px #38bdf822);text-shadow:none}
+
+/* OT: keep the original engraving visible, split it into rotating, opening layers. */
+.vg-app .unit-slot.rainbow-glow .unit-circle{opacity:1;filter:drop-shadow(0 0 3px #b583e388)}
+.rainbow-glow .circle-art{animation:ot-engraving-turn 12s linear infinite}
+.rainbow-glow .circle-unfold{display:block;opacity:.4;animation:ot-engraving-unfold 4s ease-in-out infinite}
+.rainbow-glow .circle-spectrum{display:block;inset:3%;border-radius:50%;opacity:.85;background:conic-gradient(from 25deg,#fb78aa,transparent 18%,#ffd37b 27%,#7aefbe 43%,transparent 54%,#69d9ff 67%,#c49aff 84%,#fb78aa);mask:radial-gradient(circle,transparent 65%,#000 66.5%,#000 68%,transparent 69.5%);animation:ot-spectrum-turn 5s linear infinite}
+.vg-app .unit-power.rainbow-text .power-value{color:#e8b5ff;background:none;text-shadow:none;filter:drop-shadow(0 0 3px #f38ce7aa) drop-shadow(0 0 9px #63cfff88)}
+.vg-app .unit-power.rainbow-text .digit-static,.vg-app .unit-power.rainbow-text .digit-window,.vg-app .unit-power.rainbow-text .digit-punctuation{background:none;color:var(--digit-tone,#e8b5ff);text-shadow:none;animation:ot-digit-flow 4s linear infinite;animation-delay:calc(var(--digit-index,0)*-.26s)}
+.vg-app .unit-power.rainbow-text .digit-track>span{background:none;color:inherit;text-shadow:none;animation:none}
+@keyframes ot-engraving-turn{to{transform:rotate(360deg)}}
+@keyframes ot-spectrum-turn{to{transform:rotate(-360deg)}}
+@keyframes ot-engraving-unfold{0%{transform:rotate(0) scale(.76);opacity:0}22%{opacity:.6}70%{opacity:.3}100%{transform:rotate(-90deg) scale(1.12);opacity:0}}
+@keyframes ot-digit-flow{0%,100%{color:#ff98cb}20%{color:#ffd985}40%{color:#8ef1b6}60%{color:#85dcff}80%{color:#c7a7ff}}
+
+/* The drawer communicates selection with a lit edge, keeping every glyph sharp. */
+.drawer-value-button{position:relative;padding-bottom:6px;isolation:isolate}
+.drawer-value-button::after{content:'';position:absolute;bottom:0;left:0;width:0;height:2px;background:#70dbff;box-shadow:0 0 6px #38bdf899;transition:width .2s ease;pointer-events:none}
+.drawer-value-button.is-active::after{width:70%}
+.shield-value-button::after{background:#86efac;box-shadow:0 0 6px #4ade8099}
+.drawer-value-button.is-active .drawer-live-power,.unit-drawer .drawer-live-power .power-value,.unit-drawer .drawer-live-power .digit-static,.unit-drawer .drawer-live-power .digit-window,.unit-drawer .drawer-live-power .digit-track>span,.unit-drawer .drawer-live-power .digit-punctuation{filter:none;text-shadow:none;background:none}
+.unit-drawer .drawer-live-power .power-value{animation:none;color:inherit}
+.unit-drawer .drawer-live-power .digit-static,.unit-drawer .drawer-live-power .digit-window,.unit-drawer .drawer-live-power .digit-track>span,.unit-drawer .drawer-live-power .digit-punctuation{animation:none;color:inherit}
+.drawer-value-button.is-active .drawer-value-label{color:#bae6fd}
+
+/* Grade shortcuts are just grades. Long-press alternatives stay out of the way. */
+.grade-quick-picker{border-color:var(--skin-line,#304663);padding:10px;background:#091322}
+.grade-quick-picker .grade-picker-heading{gap:8px;margin-bottom:8px}
+.grade-stepper{display:flex;align-items:center;gap:3px;margin-left:auto}
+.grade-stepper button{display:grid;place-items:center;width:34px;height:36px;border:1px solid #304663;border-radius:5px;color:#a9d7f5;background:#112036}
+.grade-stepper button:disabled{opacity:.3}
+.grade-stepper output{min-width:28px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:22px;color:#e0f2fe}
+.grade-quick-picker .grade-options{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.grade-quick-picker .grade-options button{min-height:44px;padding:0;touch-action:none;user-select:none;-webkit-touch-callout:none}
+.grade-quick-picker .grade-options b{font-size:23px}
+.grade-quick-picker .grade-options button[aria-pressed=true]{border-color:#70dbff;background:#163754;color:#dcf4ff;box-shadow:inset 0 -2px #70dbff66}
+.grade-hint,.grade-step-hint{font-size:10px;line-height:1.55;color:#91a5bd;margin-top:8px}
+.grade-step-hint{color:#6d849e;margin-top:4px}
+.grade-zero-options{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0;margin-top:6px;border-top:1px solid #243954}
+.grade-zero-options>span{grid-column:1/-1;font-size:11px;color:#a9d7f5}
+.grade-zero-options button{min-height:40px;border:1px solid #304663;border-radius:5px;background:#12243b;color:#d8f3ff;font-family:'Barlow Condensed',sans-serif;font-size:20px}
+.grade-quick-picker button:focus-visible,.skin-options button:focus-visible{outline:2px solid #a5e6ff;outline-offset:2px}
+
+/* Skin surfaces use the same ink, geometry and material as their ring preview. */
+.vg-app[data-skin=ember]{--scene-center:#2b1c22;--scene-edge:#0c0b17;--skin-accent:#efb66c;--skin-line:#644c46;--skin-panel:#211b23;--skin-light:#ffe0b4;--skin-radius:3px;background:linear-gradient(135deg,transparent 47%,#efb66c06 49%,transparent 51%) 0 0/42px 42px,radial-gradient(ellipse at 50% 36%,var(--scene-center),var(--scene-edge) 80%)}
+.vg-app[data-skin=ember] .unit-circle{--ring-ink:#f2b879;--ring-muted:#ad6549}
+.vg-app[data-skin=ember] .circle-vanguard{--ring-ink:#ffdc9d;--ring-muted:#d7874e}
+.vg-app[data-skin=ember] .unit-power.text-yellow-400,.vg-app[data-skin=ember] .unit-power.text-blue-400{color:#ffd28d}
+.vg-app[data-skin=forest]{--scene-center:#152e2f;--scene-edge:#050d1a;--skin-accent:#72dfba;--skin-line:#355e5b;--skin-panel:#10262c;--skin-light:#bcf5dc;--skin-radius:17px;background:radial-gradient(ellipse at 10% 20%,#5aab7a0a,transparent 36%),repeating-radial-gradient(ellipse at 100% 0,transparent 0 68px,#72dfba05 69px 70px,transparent 71px 125px),radial-gradient(ellipse at 50% 36%,var(--scene-center),var(--scene-edge) 80%)}
+.vg-app[data-skin=forest] .unit-circle{--ring-ink:#8ce0b5;--ring-muted:#4e8f7c}
+.vg-app[data-skin=forest] .circle-vanguard{--ring-ink:#c0f3df;--ring-muted:#68bda6}
+.vg-app[data-skin=forest] .unit-power.text-yellow-400,.vg-app[data-skin=forest] .unit-power.text-blue-400{color:#a2ebd1}
+.vg-app[data-skin=ember] .energy-section,.vg-app[data-skin=ember] .match-panel{border-radius:var(--skin-radius);border-color:var(--skin-line);background:linear-gradient(120deg,#efb66c0a,transparent 50%),var(--skin-panel);box-shadow:inset 3px 0 #c98b5544}
+.vg-app[data-skin=forest] .energy-section,.vg-app[data-skin=forest] .match-panel{border-radius:17px 4px 17px 4px;border-color:var(--skin-line);background:radial-gradient(ellipse at 100% 0,#72dfba0a,transparent 55%),var(--skin-panel);box-shadow:inset 0 1px #72dfba20}
+.vg-app:not([data-skin=circuit]) .match-panel::before{right:8px;top:8px;width:35px;height:35px;border-radius:var(--skin-radius);transform:rotate(45deg);box-shadow:0 0 0 7px var(--skin-accent);opacity:.06}
+.vg-app:not([data-skin=circuit]) .match-actions button,.vg-app:not([data-skin=circuit]) .match-counter,.vg-app:not([data-skin=circuit]) .energy-section button{border-color:var(--skin-line);border-radius:var(--skin-radius);background:color-mix(in srgb,var(--skin-panel) 85%,#000);color:var(--skin-light)}
+.vg-app:not([data-skin=circuit]) .unit-drawer,.vg-app:not([data-skin=circuit]) .tools-panel,.vg-app:not([data-skin=circuit]) .grade-picker{border-color:var(--skin-line);background:var(--skin-panel)}
+.vg-app:not([data-skin=circuit]) .drawer-heading,.vg-app:not([data-skin=circuit]) .tools-heading{background:var(--skin-panel)}
+.vg-app[data-skin=ember] .column-total{border-bottom:1px solid #ad654944}
+.vg-app[data-skin=forest] .column-total{border-bottom:1px solid #68bda633;border-radius:0 0 40% 40%}
+.vg-app[data-skin=ember] .column-attack:not(:disabled){border-color:#ae7650;border-radius:3px;color:#ffe1ac;background:linear-gradient(135deg,#91603a55,#442d2d);box-shadow:inset 0 1px #efb66c22}
+.vg-app[data-skin=forest] .column-attack:not(:disabled){border-color:#4f9181;border-radius:12px 3px;color:#c0f3df;background:linear-gradient(135deg,#32685988,#142d34);box-shadow:inset 0 1px #72dfba22}
+.vg-app[data-skin=ember] .field-horizon i{width:14px;height:14px;top:9px;clip-path:polygon(50% 0,100% 100%,0 100%);background:var(--skin-accent);transform:none}
+.vg-app[data-skin=forest] .field-horizon i{width:12px;height:7px;border-radius:100% 0;top:12px;transform:rotate(-25deg)}
+
+.appearance-controls .skin-options{gap:7px}
+.appearance-controls .skin-options button{gap:4px;justify-content:flex-start;padding:4px 4px 9px;background:#070f1e;overflow:hidden;min-height:125px}
+.appearance-controls .skin-options button[aria-pressed=true]{border-color:var(--skin-accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--skin-accent) 20%,transparent)}
+.skin-options small{font-size:9px;color:#70879e;line-height:1.3}
+.skin-preview{position:relative;display:grid;place-items:center;width:100%;height:80px;isolation:isolate;--ring-ink:#80d7ff;--ring-muted:#397da4;--ring-source:url('/field-circuit-blue.svg');background:radial-gradient(circle,#16324e,#080f20 70%);overflow:hidden}
+.skin-preview .ring-engraving{width:70px;height:70px;inset:3px auto auto 50%;transform:translateX(-50%);opacity:.85}
+.skin-preview b{position:relative;z-index:1;font-family:'Barlow Condensed',sans-serif;font-size:23px;font-weight:600;color:#9cdeff}
+.skin-preview-track{position:absolute;bottom:4px;height:3px;left:12%;right:12%;border:1px solid #397da4}
+.skin-options [data-swatch=ember]{border-radius:3px}
+.skin-options [data-swatch=ember] .skin-preview{--ring-ink:#ffd28d;--ring-muted:#b37c4f;background:repeating-linear-gradient(130deg,#edb46b08 0 1px,transparent 2px 14px),radial-gradient(circle,#462d29,#181220 80%)}
+.skin-options [data-swatch=ember] b{color:#ffdc9d}.skin-options [data-swatch=ember] .skin-preview-track{border-color:#ad6549;transform:skewX(-25deg)}
+.skin-options [data-swatch=forest]{border-radius:12px 3px}
+.skin-options [data-swatch=forest] .skin-preview{--ring-ink:#c0f3df;--ring-muted:#68bda6;background:repeating-radial-gradient(ellipse at 100% 0,transparent 0 13px,#72dfba0a 14px 15px),radial-gradient(circle,#214440,#091b26 80%)}
+.skin-options [data-swatch=forest] b{color:#bcf5dc}.skin-options [data-swatch=forest] .skin-preview-track{border-color:#68bda6;border-radius:70% 0}
+
+.vg-app[data-effects=false] .circle-art,.vg-app[data-effects=false] .circle-unfold,.vg-app[data-effects=false] .circle-spectrum,.vg-app[data-effects=false] .unit-power.rainbow-text .digit-static,.vg-app[data-effects=false] .unit-power.rainbow-text .digit-window,.vg-app[data-effects=false] .unit-power.rainbow-text .digit-punctuation{animation:none!important}
+.vg-app[data-effects=false] .circle-unfold{display:none}
+.vg-app[data-effects=false] .ot-button-style.ot-active{animation:none!important}
+@media(prefers-reduced-motion:reduce){
+    .rainbow-glow .circle-art,.rainbow-glow .circle-unfold,.rainbow-glow .circle-spectrum,.vg-app .unit-power.rainbow-text .digit-static,.vg-app .unit-power.rainbow-text .digit-window,.vg-app .unit-power.rainbow-text .digit-punctuation{animation:none!important}
+    .rainbow-glow .circle-unfold{display:none}.drawer-value-button::after{transition:none}
+}
