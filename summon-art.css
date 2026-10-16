@@ -1,6 +1,6 @@
 /* Illustrated playmats are separate from the legible control surfaces. */
-.vg-app{position:relative;isolation:isolate;--scene-art:none;--dragon-art:url('/skins/dragon-sanctuary.webp');--grove-art:url('/skins/moon-grove.webp');--spell-ink:#55d8ff;--spell-hot:#c5f8ff}
-.vg-app::before{content:'';position:fixed;z-index:-1;pointer-events:none;top:0;bottom:0;left:50%;width:min(100%,560px);transform:translateX(-50%);background-image:radial-gradient(ellipse at 50% 35%,#020617d9,#020617a6 48%,#02061788),var(--scene-art);background-position:center;background-size:100% 100%;filter:saturate(.6);box-shadow:0 0 100px #020617}
+.vg-app{position:relative;isolation:isolate;--scene-art:none;--dragon-art:url('/skins/dragon-sanctuary.webp');--grove-art:url('/skins/moon-grove.webp');--spell-ink:#55d8ff;--spell-hot:#c5f8ff;--readout-cutout:radial-gradient(ellipse 48% 16% at 50% 47%,transparent 65%,#000 100%)}
+.vg-app::before{content:'';position:fixed;z-index:-1;pointer-events:none;top:0;bottom:0;left:50%;width:min(100%,560px);transform:translateX(-50%);background-image:radial-gradient(ellipse at 50% 35%,#020617d9,#020617a6 48%,#02061788),var(--scene-art);background-position:center top;background-size:cover;filter:saturate(.6);box-shadow:0 0 100px #020617}
 .vg-app[data-skin=ember]{--scene-art:var(--dragon-art);--skin-panel:#1b1520;--skin-accent:#d5b18c;--skin-line:#67503e;--spell-ink:#ff9d46;--spell-hot:#ffebbd;background:#0b0b17}
 .vg-app[data-skin=forest]{--scene-art:var(--grove-art);--skin-panel:#101b2d;--skin-accent:#a8cdc8;--skin-line:#3e5965;--spell-ink:#9fe8e3;--spell-hot:#eef8ff;background:#060e1c}
 .vg-app[data-skin=ember] .energy-section,.vg-app[data-skin=ember] .match-panel{background:linear-gradient(110deg,#18141ced,#111320ee);border-color:#67503e;border-width:1px;box-shadow:none;border-radius:2px 13px 2px 13px}
@@ -11,7 +11,7 @@
 .skin-options [data-swatch=ember] .skin-preview{background:linear-gradient(#06091411,#06091466),var(--dragon-art) center/100% 100%}
 .skin-options [data-swatch=forest] .skin-preview{background:linear-gradient(#06091422,#06091477),var(--grove-art) center/100% 100%}
 .appearance-controls .skin-options button{min-height:165px}.skin-preview{height:112px}.skin-preview .ring-engraving{top:23px}.skin-preview b{margin-top:18px}.skin-options small{font-size:10px}.skin-options button>span:not(.skin-preview){font-size:11px;line-height:1.5}
-.vg-app:not([data-skin=circuit]) .unit-slot::before{content:'';position:absolute;left:4%;top:12px;width:92%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#040a18e6 30%,#040a18aa 52%,transparent 73%);pointer-events:none}
+.vg-app:not([data-skin=circuit]) .field-section::before{content:'';position:absolute;inset:-4px -6px 0;z-index:-1;border-radius:18px;background:linear-gradient(180deg,#060c18b8,#060c1877 64%,#060c18b8);pointer-events:none}
 .unit-slot:not([data-rested=true]) .unit-power .power-value{filter:drop-shadow(0 1px 1px #020617);text-shadow:none}
 
 /* Quiet idle state: the information stays crisp; only the current action shines. */
@@ -35,6 +35,29 @@
 .energy-node:focus-visible{outline:1px solid #7dd3fc;outline-offset:1px}
 .vg-app .field-horizon{opacity:.12}
 
+/* Keep the engraved perimeter, with a quiet opening behind the readout. */
+.vg-app .unit-slot .unit-circle{mask-image:var(--readout-cutout)}
+.vg-app .unit-slot[data-value="0"]:not(.rainbow-glow):not([data-selection=true]) .unit-circle{mask-image:radial-gradient(circle closest-side,transparent 68%,#000 74%)}
+.vg-app .slot-grade{border:1px solid transparent;border-radius:6px;background:transparent;color:#9fadc1}
+.vg-app .slot-grade:hover,.vg-app .slot-grade:focus-visible{border-color:#71809e88;background:#111c2c}
+.vg-app .slot-actions{border-radius:7px;background:linear-gradient(180deg,transparent,#0a122455);box-shadow:inset 0 -1px #60738918}
+.vg-app .slot-actions button{border-radius:5px;transition:background .15s}
+.vg-app .slot-actions .official-symbol{filter:brightness(.82) saturate(.55)}
+.vg-app .slot-actions .text-red-500{color:#b17986}
+.vg-app .slot-actions button:not(:disabled):hover,.vg-app .slot-actions button:focus-visible{background:#26324780}
+.vg-app .slot-actions button:not(:disabled):hover .official-symbol,.vg-app .slot-actions button:focus-visible .official-symbol{filter:none}
+.vg-app .attack-lane{padding-top:3px;border-top:1px solid color-mix(in srgb,var(--skin-line) 65%,transparent)}
+.vg-app .attack-lane .column-total{border:0;border-radius:0}
+.vg-app .column-total-label{font-size:10px;letter-spacing:.03em;color:#8b9bb2}
+.vg-app .column-attack{font-weight:500;letter-spacing:.04em}
+.vg-app .energy-section .energy-actions button{min-height:32px;border-color:color-mix(in srgb,var(--skin-line) 65%,transparent);background:#0e1929;color:#b9cbd8;font-weight:500;transition:background .15s,border-color .15s}
+.vg-app .energy-section .energy-actions button:last-child{color:#c49b9f;background:#241b27;border-color:#60404c88}
+.vg-app .energy-section .energy-actions button:hover,.vg-app .energy-section .energy-actions button:focus-visible{background:#1b2b3f;border-color:var(--skin-accent)}
+.vg-app .match-panel .match-actions button,.vg-app .match-panel .match-counter{border-color:color-mix(in srgb,var(--skin-line) 65%,transparent)}
+.vg-app .match-panel .match-actions button{color:#b9cbd8}
+.vg-app .match-panel .match-actions .match-reset-button{color:#c49b9f;border-color:#60404c88}
+@media(prefers-reduced-motion:reduce){.vg-app .slot-actions button,.vg-app .energy-actions button,.energy-node::before{transition:none}}
+
 /* A field overlay gives the seal space to open beyond the unit's hit rectangle. */
 .field-section{position:relative;isolation:isolate}
 .battle-spells{position:absolute;inset:0;pointer-events:none;z-index:7;overflow:visible}
@@ -42,15 +65,15 @@
 .spell-anchor.ot-anchor{z-index:1}.spell-anchor.action-anchor{z-index:2}
 .field-section .unit-slot .unit-power,.field-section .slot-topline{z-index:9}
 .field-section .unit-slot .unit-power{pointer-events:none}
-.neon-orbit{position:absolute;inset:-3%;display:block;pointer-events:none;isolation:isolate;--seal-glow:#a461ff;--seal-core:#dbedff;filter:drop-shadow(0 0 2px #9e70ff66)}
+.neon-orbit{position:absolute;inset:-3%;display:block;pointer-events:none;isolation:isolate;--seal-glow:#a461ff;--seal-core:#dbedff;mask-image:var(--readout-cutout);filter:drop-shadow(0 0 2px #9e70ff66)}
 .neon-stream{position:absolute;inset:3%;border-radius:50%;background:conic-gradient(#ff78e8,#9b6cff,#42dbff,#52ffc0,#fff591,#ff8bbb,#ff78e8);mask:radial-gradient(circle,transparent 61%,#000 63%,#000 65%,transparent 67%);opacity:.6;animation:neon-turn 8s linear infinite}
 .summon-seal{display:block;width:100%;height:100%;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
 .neon-runes{position:absolute;inset:0;color:#c18aff;filter:drop-shadow(0 0 1px #b456ff88);opacity:.8;animation:neon-turn 10s linear infinite}
-.neon-runes-inner{inset:10%;color:#8feaff;animation:neon-counter-turn 14s linear infinite;opacity:.45}
+.neon-runes-inner{inset:13%;color:#8feaff;animation:neon-counter-turn 14s linear infinite;opacity:.36}
 .neon-pulse{position:absolute;inset:0;border-radius:50%;border:1px solid #a9efff88;animation:neon-unfold 4.8s ease-out infinite}
 @keyframes neon-turn{to{transform:rotate(360deg)}}@keyframes neon-counter-turn{to{transform:rotate(-360deg)}}
 @keyframes neon-unfold{0%{transform:scale(.82);opacity:0}22%{opacity:.4}100%{transform:scale(1.1);opacity:0}}
-.vg-app .unit-slot.rainbow-glow .unit-circle{opacity:.24;filter:none}
+.vg-app .unit-slot.rainbow-glow .unit-circle{opacity:.12;filter:none}
 .rainbow-glow .circle-art{animation-duration:16s}.rainbow-glow .circle-unfold{animation-duration:4.8s}
 .rainbow-glow .circle-spectrum{display:none}
 .vg-app .unit-power.rainbow-text .power-value{filter:drop-shadow(0 1px 1px #071123) drop-shadow(0 0 4px #b969ff) drop-shadow(0 0 8px #4adfff88);-webkit-text-stroke:.3px #071123;paint-order:stroke fill}
