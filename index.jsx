@@ -1575,7 +1575,7 @@ export default function App() {
                         {columns.map(column => renderUnitSlot(`front_${column}`, column === 'center' ? t.vanguard : column === 'left' ? t.front_l : t.front_r))}
                         {hasBackRowAttack && columns.map(column => <ColumnAttackButton key={`front-attack-${column}`} frontId={`front_${column}`} backId={`back_${column}`} attackerId={`front_${column}`} compact />)}
                         {columns.map(column => renderUnitSlot(`back_${column}`, column === 'left' ? t.back_l : column === 'center' ? t.back_c : t.back_r))}
-                        {columns.map(column => { const attackerId = `${hasBackRowAttack ? 'back' : 'front'}_${column}`; return <div key={`attack-${column}`} className="min-w-0"><TotalPowerDisplay frontId={`front_${column}`} backId={`back_${column}`} attackerId={attackerId} /><ColumnAttackButton frontId={`front_${column}`} backId={`back_${column}`} attackerId={attackerId} /></div>; })}
+                        {columns.map(column => { const attackerId = `${hasBackRowAttack ? 'back' : 'front'}_${column}`; return <div key={`attack-${column}`} className="attack-lane min-w-0"><TotalPowerDisplay frontId={`front_${column}`} backId={`back_${column}`} attackerId={attackerId} /><ColumnAttackButton frontId={`front_${column}`} backId={`back_${column}`} attackerId={attackerId} /></div>; })}
                     </div>
                 </section>
                 <section className="energy-section bg-slate-900/50 border border-slate-700 rounded-xl p-3">
@@ -1584,7 +1584,7 @@ export default function App() {
                         <div className="absolute left-1 right-1 h-0.5 bg-slate-800 top-1/2 -translate-y-1/2 z-0"></div>
                         {Array.from({ length: 11 }).map((_, i) => (<button key={i} onClick={() => setEnergy(i)} aria-label={`${t.energy}: ${i}`} aria-pressed={i === gameState.energy} data-energy-state={i === gameState.energy ? 'current' : i < gameState.energy ? 'filled' : 'empty'} className="energy-node relative z-10"/>))}
                     </div>
-                    <div className="grid grid-cols-6 gap-1.5">{ENERGY_ACTIONS.map(action => (<button key={action.label_zh} onClick={() => setEnergy(gameState.energy + action.value)} className={`${action.color} border border-cyan-800/50 rounded py-1 text-[10px] font-bold`}>{action[`label_${language}`]}</button>))}</div>
+                    <div className="energy-actions grid grid-cols-6 gap-1.5">{ENERGY_ACTIONS.map(action => (<button key={action.label_zh} onClick={() => setEnergy(gameState.energy + action.value)} className={`${action.color} border border-cyan-800/50 rounded py-1 text-[10px] font-bold`}>{action[`label_${language}`]}</button>))}</div>
                 </section>
 
                 <MatchPanel match={gameState.match} resources={gameState.resources} canRestore={!!gameState.resetBackup} t={t} onTimer={()=>updateState({match:toggleMatchTimer(stateRef.current.match)},false,{kind:'timer'})} onReset={()=>openMatchDialog('reset')} onRestore={()=>openMatchDialog('restore')} onCounter={(key,delta)=>updateState({resources:{...stateRef.current.resources,[key]:Math.max(0,stateRef.current.resources[key]+delta)}})}/>
