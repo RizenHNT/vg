@@ -1582,7 +1582,7 @@ export default function App() {
                     <div className="flex justify-between items-end mb-2 border-b border-slate-800 pb-2"><h2 className="text-[10px] font-bold text-cyan-500 uppercase tracking-[0.2em] flex items-center gap-1"><Zap size={12} /> {t.energy}</h2><div className="text-2xl font-black text-white font-mono leading-none text-shadow-neon">{gameState.energy} / {MAX_ENERGY}</div></div>
                     <div className="flex justify-between gap-0.5 h-8 items-center px-1 mb-3 relative">
                         <div className="absolute left-1 right-1 h-0.5 bg-slate-800 top-1/2 -translate-y-1/2 z-0"></div>
-                        {Array.from({ length: 11 }).map((_, i) => (<button key={i} onClick={() => setEnergy(i)} className={`relative z-10 rounded-full flex items-center justify-center transition-all ${i <= gameState.energy ? 'w-4 h-4 bg-cyan-500 shadow-[0_0_8px_#06b6d4]' : 'w-2 h-2 bg-slate-800 hover:bg-slate-700'}`}>{i <= gameState.energy && <div className="w-1 h-1 bg-white rounded-full"></div>}</button>))}
+                        {Array.from({ length: 11 }).map((_, i) => (<button key={i} onClick={() => setEnergy(i)} aria-label={`${t.energy}: ${i}`} aria-pressed={i === gameState.energy} data-energy-state={i === gameState.energy ? 'current' : i < gameState.energy ? 'filled' : 'empty'} className="energy-node relative z-10"/>))}
                     </div>
                     <div className="grid grid-cols-6 gap-1.5">{ENERGY_ACTIONS.map(action => (<button key={action.label_zh} onClick={() => setEnergy(gameState.energy + action.value)} className={`${action.color} border border-cyan-800/50 rounded py-1 text-[10px] font-bold`}>{action[`label_${language}`]}</button>))}</div>
                 </section>

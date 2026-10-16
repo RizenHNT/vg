@@ -14,7 +14,7 @@ export const SummonSeal = React.memo(function SummonSeal({ inner=false }) {
 });
 
 export function NeonOrbit() {
-    return <span className="neon-orbit" aria-hidden="true"><i className="neon-aura"/><i className="neon-stream"/><span className="neon-runes"><SummonSeal/></span><span className="neon-runes neon-runes-inner"><SummonSeal inner/></span><i className="neon-pulse"/><i className="neon-pulse neon-pulse-second"/>{SPOKES.filter((_,i)=>i%2===0).map((angle,i)=><i key={angle} className="neon-star" style={{'--spark-angle':angle+'deg','--spark-delay':i*-.4+'s'}}/>)}</span>;
+    return <span className="neon-orbit" aria-hidden="true"><i className="neon-stream"/><span className="neon-runes"><SummonSeal/></span><span className="neon-runes neon-runes-inner"><SummonSeal inner/></span><i className="neon-pulse"/></span>;
 }
 
 export function SummonSequence({effect,t}) {

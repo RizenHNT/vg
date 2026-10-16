@@ -1,19 +1,39 @@
 /* Illustrated playmats are separate from the legible control surfaces. */
 .vg-app{position:relative;isolation:isolate;--scene-art:none;--dragon-art:url('/skins/dragon-sanctuary.webp');--grove-art:url('/skins/moon-grove.webp');--spell-ink:#55d8ff;--spell-hot:#c5f8ff}
-.vg-app::before{content:'';position:fixed;z-index:-1;pointer-events:none;top:0;bottom:0;left:50%;width:min(100%,560px);transform:translateX(-50%);background-image:linear-gradient(180deg,#02061722,#02061766 68%,#02061733),var(--scene-art);background-position:center;background-size:100% 100%;box-shadow:0 0 100px #020617}
-.vg-app[data-skin=ember]{--scene-art:var(--dragon-art);--skin-panel:#1b1520;--skin-accent:#ffc27c;--skin-line:#ae784b;--spell-ink:#ff9d46;--spell-hot:#ffebbd;background:#0b0b17}
-.vg-app[data-skin=forest]{--scene-art:var(--grove-art);--skin-panel:#101b2d;--skin-accent:#b5e7dd;--skin-line:#678e9a;--spell-ink:#9fe8e3;--spell-hot:#eef8ff;background:#060e1c}
-.vg-app[data-skin=ember] .energy-section,.vg-app[data-skin=ember] .match-panel{background:linear-gradient(110deg,#211319ed,#171223ee);border-color:#b78351;border-width:1px 1px 1px 3px;box-shadow:inset 0 0 0 3px #bd8b4920,0 5px 20px #0005;border-radius:2px 13px 2px 13px}
-.vg-app[data-skin=forest] .energy-section,.vg-app[data-skin=forest] .match-panel{background:linear-gradient(120deg,#0c192cee,#0b1c27ed);border-color:#839eae;border-radius:20px 2px;box-shadow:inset 0 0 0 3px #9ac4d316,0 5px 20px #0005}
-.vg-app[data-skin=ember] .match-panel::before{width:48px;height:48px;right:-10px;top:-10px;border:double 4px #dfa061;border-radius:2px;box-shadow:0 0 0 6px #d7924344;opacity:.25}
-.vg-app[data-skin=forest] .match-panel::before{width:60px;height:60px;right:-14px;top:-23px;border:1px solid #c6dfea;border-radius:50%;box-shadow:-9px 7px 0 -2px #0b1c27,-11px 9px 0 -2px #a4c6d0;opacity:.3;transform:none}
-.vg-app[data-skin=ember] .column-attack:not(:disabled){border:1px solid #be8c54;background:linear-gradient(110deg,#412524e8,#2a1d24e8);box-shadow:inset 0 0 0 2px #dfb46d20;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
-.vg-app[data-skin=forest] .column-attack:not(:disabled){background:linear-gradient(110deg,#193b49ed,#15243ced);border-color:#87bdc1;border-radius:16px 2px;box-shadow:inset 0 0 0 2px #acd8ed16}
+.vg-app::before{content:'';position:fixed;z-index:-1;pointer-events:none;top:0;bottom:0;left:50%;width:min(100%,560px);transform:translateX(-50%);background-image:radial-gradient(ellipse at 50% 35%,#020617d9,#020617a6 48%,#02061788),var(--scene-art);background-position:center;background-size:100% 100%;filter:saturate(.6);box-shadow:0 0 100px #020617}
+.vg-app[data-skin=ember]{--scene-art:var(--dragon-art);--skin-panel:#1b1520;--skin-accent:#d5b18c;--skin-line:#67503e;--spell-ink:#ff9d46;--spell-hot:#ffebbd;background:#0b0b17}
+.vg-app[data-skin=forest]{--scene-art:var(--grove-art);--skin-panel:#101b2d;--skin-accent:#a8cdc8;--skin-line:#3e5965;--spell-ink:#9fe8e3;--spell-hot:#eef8ff;background:#060e1c}
+.vg-app[data-skin=ember] .energy-section,.vg-app[data-skin=ember] .match-panel{background:linear-gradient(110deg,#18141ced,#111320ee);border-color:#67503e;border-width:1px;box-shadow:none;border-radius:2px 13px 2px 13px}
+.vg-app[data-skin=forest] .energy-section,.vg-app[data-skin=forest] .match-panel{background:linear-gradient(120deg,#0c1523ee,#0b1821ed);border-color:#3e5965;border-radius:20px 2px;box-shadow:none}
+.vg-app .match-panel::before{content:none}
+.vg-app[data-skin=ember] .column-attack:not(:disabled){border:1px solid #73523e;background:linear-gradient(110deg,#2d2022e8,#211c24e8);box-shadow:none;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
+.vg-app[data-skin=forest] .column-attack:not(:disabled){background:linear-gradient(110deg,#162a35ed,#152032ed);border-color:#456770;border-radius:16px 2px;box-shadow:none}
 .skin-options [data-swatch=ember] .skin-preview{background:linear-gradient(#06091411,#06091466),var(--dragon-art) center/100% 100%}
 .skin-options [data-swatch=forest] .skin-preview{background:linear-gradient(#06091422,#06091477),var(--grove-art) center/100% 100%}
 .appearance-controls .skin-options button{min-height:165px}.skin-preview{height:112px}.skin-preview .ring-engraving{top:23px}.skin-preview b{margin-top:18px}.skin-options small{font-size:10px}.skin-options button>span:not(.skin-preview){font-size:11px;line-height:1.5}
 .vg-app:not([data-skin=circuit]) .unit-slot::before{content:'';position:absolute;left:4%;top:12px;width:92%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#040a18e6 30%,#040a18aa 52%,transparent 73%);pointer-events:none}
-.unit-slot:not([data-rested=true]) .unit-power .power-value{filter:drop-shadow(0 1px 1px #020617) drop-shadow(0 0 4px color-mix(in srgb,var(--spell-ink) 35%,transparent));text-shadow:none}
+.unit-slot:not([data-rested=true]) .unit-power .power-value{filter:drop-shadow(0 1px 1px #020617);text-shadow:none}
+
+/* Quiet idle state: the information stays crisp; only the current action shines. */
+.vg-app .unit-slot:not(.rainbow-glow):not([data-selection=true]):not([data-rested=true]) .unit-circle{opacity:.48;filter:none}
+.vg-app .unit-slot[data-value="0"]:not(.rainbow-glow):not([data-selection=true]):not([data-rested=true]) .unit-circle{opacity:.24}
+.vg-app .unit-slot:not(.rainbow-glow):not([data-selection=true]):not([data-rested=true]) .circle-vanguard{opacity:.64}
+.vg-app[data-skin=circuit] .unit-power.text-yellow-400{color:#e1cf9b}
+.vg-app[data-skin=circuit] .unit-power.text-blue-400{color:#b5dcf0}
+.vg-app[data-skin=ember] .unit-power.text-yellow-400,.vg-app[data-skin=ember] .unit-power.text-blue-400{color:#e9ccaa}
+.vg-app[data-skin=forest] .unit-power.text-yellow-400,.vg-app[data-skin=forest] .unit-power.text-blue-400{color:#bfdfd6}
+.vg-app[data-skin=circuit] .column-attack:not(:disabled){border-color:#563141;background:#211823;color:#d7b6c0}
+.vg-app .column-attack:not(:disabled):hover,.vg-app .column-attack:not(:disabled):focus-visible{border-color:var(--skin-accent);color:#f1f5f9}
+.vg-app .column-total:not([data-rested=true]) .power-value{color:#a6cbd9;filter:none;text-shadow:none}
+.vg-app .energy-section,.vg-app .match-panel{border-color:color-mix(in srgb,var(--skin-line) 70%,#0b1120)}
+.energy-section .text-shadow-neon{color:#e2e8f0;text-shadow:none}
+.energy-section h2{color:#80a5b7}
+.energy-node{display:grid;place-items:center;flex:1;max-width:28px;height:32px;border-radius:5px;background:none}
+.energy-node::before{content:'';width:6px;height:6px;border-radius:50%;background:#263447;transition:background .15s,box-shadow .15s}
+.energy-node[data-energy-state=filled]::before{background:#3c7d91}
+.energy-node[data-energy-state=current]::before{width:9px;height:9px;background:#9de4ec;box-shadow:0 0 6px #44c6d866}
+.energy-node:focus-visible{outline:1px solid #7dd3fc;outline-offset:1px}
+.vg-app .field-horizon{opacity:.12}
 
 /* A field overlay gives the seal space to open beyond the unit's hit rectangle. */
 .field-section{position:relative;isolation:isolate}
@@ -22,21 +42,19 @@
 .spell-anchor.ot-anchor{z-index:1}.spell-anchor.action-anchor{z-index:2}
 .field-section .unit-slot .unit-power,.field-section .slot-topline{z-index:9}
 .field-section .unit-slot .unit-power{pointer-events:none}
-.neon-orbit{position:absolute;inset:-7%;display:block;pointer-events:none;isolation:isolate;--seal-glow:#a461ff;--seal-core:#dbedff;filter:drop-shadow(0 0 2px #923dff) drop-shadow(0 0 5px #38bcff77)}
-.neon-aura{position:absolute;inset:-12%;border-radius:50%;background:conic-gradient(from 20deg,#c754ff66,#27c5ff66,#37ffac55,#ffd66155,#fa5bdf66);mask:radial-gradient(circle,transparent 42%,#0008 54%,#000 59%,transparent 72%);animation:neon-turn 4s linear infinite}
-.neon-stream{position:absolute;inset:3%;border-radius:50%;background:conic-gradient(#ff78e8,#9b6cff,#42dbff,#52ffc0,#fff591,#ff8bbb,#ff78e8);mask:radial-gradient(circle,transparent 61%,#000 63%,#000 65%,transparent 67%);box-shadow:0 0 15px #a45bff;animation:neon-turn 2.4s linear infinite}
+.neon-orbit{position:absolute;inset:-3%;display:block;pointer-events:none;isolation:isolate;--seal-glow:#a461ff;--seal-core:#dbedff;filter:drop-shadow(0 0 2px #9e70ff66)}
+.neon-stream{position:absolute;inset:3%;border-radius:50%;background:conic-gradient(#ff78e8,#9b6cff,#42dbff,#52ffc0,#fff591,#ff8bbb,#ff78e8);mask:radial-gradient(circle,transparent 61%,#000 63%,#000 65%,transparent 67%);opacity:.6;animation:neon-turn 8s linear infinite}
 .summon-seal{display:block;width:100%;height:100%;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
-.neon-runes{position:absolute;inset:0;color:#c18aff;filter:drop-shadow(0 0 2px #b456ff);animation:neon-turn 5s linear infinite}
-.neon-runes-inner{inset:10%;color:#8feaff;animation:neon-counter-turn 3s linear infinite;opacity:.9}
-.neon-pulse{position:absolute;inset:0;border-radius:50%;border:1px solid #a9efff;box-shadow:0 0 5px #61d7ff,inset 0 0 5px #b366ff;animation:neon-unfold 2.6s ease-out infinite}
-.neon-pulse-second{animation-delay:-1.3s;border-color:#dc9fff}
-.neon-star{position:absolute;top:50%;left:50%;width:3px;height:3px;border-radius:50%;background:#f2dfff;box-shadow:0 0 3px #fff,0 0 8px #b46fff;animation:neon-spark 2.8s ease-in-out infinite;animation-delay:var(--spark-delay)}
+.neon-runes{position:absolute;inset:0;color:#c18aff;filter:drop-shadow(0 0 1px #b456ff88);opacity:.8;animation:neon-turn 10s linear infinite}
+.neon-runes-inner{inset:10%;color:#8feaff;animation:neon-counter-turn 14s linear infinite;opacity:.45}
+.neon-pulse{position:absolute;inset:0;border-radius:50%;border:1px solid #a9efff88;animation:neon-unfold 4.8s ease-out infinite}
 @keyframes neon-turn{to{transform:rotate(360deg)}}@keyframes neon-counter-turn{to{transform:rotate(-360deg)}}
-@keyframes neon-unfold{0%{transform:scale(.72);opacity:0}18%{opacity:.9}100%{transform:scale(1.2);opacity:0}}
-@keyframes neon-spark{0%,100%{transform:rotate(var(--spark-angle)) translateX(46px) scale(.4);opacity:0}40%{opacity:1}70%{transform:rotate(calc(var(--spark-angle) + 40deg)) translateX(70px) scale(1);opacity:.8}}
-.rainbow-glow .circle-art{animation-duration:4s}.rainbow-glow .circle-unfold{animation-duration:2.6s}
+@keyframes neon-unfold{0%{transform:scale(.82);opacity:0}22%{opacity:.4}100%{transform:scale(1.1);opacity:0}}
+.vg-app .unit-slot.rainbow-glow .unit-circle{opacity:.24;filter:none}
+.rainbow-glow .circle-art{animation-duration:16s}.rainbow-glow .circle-unfold{animation-duration:4.8s}
+.rainbow-glow .circle-spectrum{display:none}
 .vg-app .unit-power.rainbow-text .power-value{filter:drop-shadow(0 1px 1px #071123) drop-shadow(0 0 4px #b969ff) drop-shadow(0 0 8px #4adfff88);-webkit-text-stroke:.3px #071123;paint-order:stroke fill}
-.vg-app .unit-power.rainbow-text .digit-static,.vg-app .unit-power.rainbow-text .digit-window,.vg-app .unit-power.rainbow-text .digit-punctuation{animation-duration:2.8s}
+.vg-app .unit-power.rainbow-text .digit-static,.vg-app .unit-power.rainbow-text .digit-window,.vg-app .unit-power.rainbow-text .digit-punctuation{animation-duration:6s}
 
 /* Summon: charge a tilted floor seal, open its rings, lift the pillar, scatter shards. */
 .summon-sequence.combat-effect{position:absolute;inset:-25%;z-index:auto;overflow:visible;--fx-color:var(--spell-ink,#55d8ff);--fx-core:var(--spell-hot,#d8faff)}

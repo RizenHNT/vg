@@ -1,6 +1,6 @@
 const CACHE_PREFIX = 'vg-counter-shell-';
-const CACHE_NAME = CACHE_PREFIX + "a023f4c88d15ec8b";
-const PRECACHE = ["/index.html","/play.html","/assets/index-Be-nkldz.js","/assets/index-D9gfHKiv.css","/manifest.webmanifest","/icons/app-192.png","/icons/app-512.png","/icons/app-maskable-512.png","/icons/apple-touch-icon.png","/fonts/barlow-condensed-600.ttf","/fonts/barlow-condensed-800.ttf","/field-circuit-blue.svg","/field-circuit-gold.svg","/field-circuit-guard.svg","/symbols/vg-tech-atlas.png","/reference-playmat.jpg","/skins/dragon-sanctuary.webp","/skins/moon-grove.webp"];
+const CACHE_NAME = CACHE_PREFIX + "034d7ee6a47d2536";
+const PRECACHE = ["/index.html","/play.html","/assets/index-Bwtcwf4J.css","/assets/index-DV6qvzC2.js","/manifest.webmanifest","/icons/app-192.png","/icons/app-512.png","/icons/app-maskable-512.png","/icons/apple-touch-icon.png","/fonts/barlow-condensed-600.ttf","/fonts/barlow-condensed-800.ttf","/field-circuit-blue.svg","/field-circuit-gold.svg","/field-circuit-guard.svg","/symbols/vg-tech-atlas.png","/reference-playmat.jpg","/skins/dragon-sanctuary.webp","/skins/moon-grove.webp"];
 const KNOWN_ASSETS = new Set(PRECACHE);
 
 self.addEventListener('install', event => {
