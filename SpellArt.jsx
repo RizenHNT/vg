@@ -49,7 +49,7 @@ export function BattleSpells({ effects, units, t }) {
         return()=>{window.removeEventListener('resize',measure);observer?.disconnect();};
     },[signature]);
     return <div ref={ref} className="battle-spells" aria-hidden="true">
-        {otSlots.map(slot=>positions[slot]&&<div key={slot} data-testid={'neon-'+slot} className="spell-anchor ot-anchor" style={positions[slot]}><NeonOrbit/></div>)}
+        {otSlots.map(slot=>positions[slot]&&<div key={slot} data-testid={'neon-'+slot} data-rested={units[slot].isRested} className="spell-anchor ot-anchor" style={positions[slot]}><NeonOrbit/></div>)}
         {effects.flatMap(effect=>effect.slots.map(slot=>positions[slot]&&<div key={effect.id+'-'+slot} data-effect-slot={slot} className="spell-anchor action-anchor" style={positions[slot]}><SummonSequence effect={effect} t={t}/></div>))}
     </div>;
 }

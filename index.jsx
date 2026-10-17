@@ -1366,7 +1366,7 @@ export default function App() {
         const border = selected ? 'border-yellow-400' : source || target ? 'border-blue-500' : isVanguardSlot ? 'border-red-500' : 'border-slate-800';
         const tone = selected ? 'bg-slate-800' : source || target ? 'bg-blue-900/20' : unit.isRested ? 'bg-slate-950/90 opacity-40' : unit.isSupporting ? 'bg-green-900/20' : isVanguardSlot ? 'bg-red-950/20' : 'bg-slate-900/80';
         const numberTone = unit.otActive ? 'rainbow-text' : isVanguardSlot ? 'text-blue-400' : power > 0 ? 'text-yellow-400' : power < 0 ? 'text-red-500' : 'text-slate-400';
-        return <div key={id} role="group" tabIndex={0} aria-label={label + ' ' + formatNumber(power)}
+        return <div key={id} role="group" tabIndex={0} aria-label={label + ' ' + formatNumber(power) + (unit.isRested ? ', ' + t.rest : '')}
             data-testid={'unit-' + id} data-slot={id} data-value={power} data-reserved={reserved}
             data-rested={unit.isRested} data-intercept-shield={showInterceptShield || undefined}
             data-trigger-stage={triggerStage || undefined}
@@ -1395,7 +1395,7 @@ export default function App() {
             </div>
             {showInterceptShield && <button type="button" data-shield-toggle data-testid={'shield-' + id} aria-label={label + ' ' + t.shield_value + ' ' + formatNumber(getUnitShield(unit))} className="slot-shield" onClick={e => openShield(e, id)}><Shield size={11} /><span>{formatNumber(getUnitShield(unit))}</span></button>}
             <PowerNumber value={power} maxSize={power.toString().length > 8 ? 22 : 34} resetKey={id} className={'unit-power font-mono ' + numberTone} />
-            <div className="slot-critical">{unit.crit !== 1 && <><OfficialSymbol kind="critical" /><span>{unit.crit}</span></>}{reserved && <OfficialSymbol kind="intercept" />}</div>
+            <div className="slot-critical">{unit.isRested && <span className="unit-rest-label" aria-hidden="true">{t.rest}</span>}{unit.crit !== 1 && <><OfficialSymbol kind="critical" /><span>{unit.crit}</span></>}{reserved && <OfficialSymbol kind="intercept" />}</div>
             <div className={'slot-actions' + (id.startsWith('back') && power > 0 ? ' slot-rear-actions' : '')}>
                 {id.startsWith('back') && power > 0 && <button type="button" aria-label={t.rear_attack} aria-pressed={unit.isBackRowAttack} disabled={reserved} className={'slot-symbol-button ' + (unit.isBackRowAttack ? 'is-attacking' : '')} onClick={e => { e.stopPropagation(); modifyUnit(id, { isBackRowAttack: !unit.isBackRowAttack, isSupporting: false }); }}><Sword size={15} /></button>}
                 <button type="button" aria-label={t.rest} disabled={unit.isRested || reserved} onClick={e => { e.stopPropagation(); restUnit(id); }}><OfficialSymbol kind="rest" /></button>
@@ -1482,9 +1482,9 @@ export default function App() {
                     <div className="w-2 h-5 bg-cyan-500 rounded-sm shadow-[0_0_8px_#06b6d4]"></div>
                     <h1 className="font-bold text-base tracking-widest text-white font-mono"><button type="button" className="brand-title" data-testid="brand-title" onClick={tapBrand}>{t.app_name}</button></h1>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="header-actions flex items-center gap-3">
                     <div className="relative">
-                        <button data-testid="attack-count-toggle" onClick={() => setShowAttackAdjust(!showAttackAdjust)} className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-full text-xs hover:bg-slate-700 transition-colors">
+                        <button data-testid="attack-count-toggle" onClick={() => setShowAttackAdjust(!showAttackAdjust)} className="attack-count-button flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-full text-xs hover:bg-slate-700 transition-colors">
                             <Sword size={12} className="text-yellow-400" />
                             <span className="text-slate-300 font-bold">{t.attack}: {gameState.attackCount}</span>
                         </button>
