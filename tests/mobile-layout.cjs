@@ -50,9 +50,17 @@ const demo = { language:'zh', energy:5, units:{front_center:{grade:3,basePower:1
             await page.getByTestId('unit-front_left').click();await page.getByTestId('unit-front_right').click();
             assert.equal(await page.getByTestId('total-front_center').getAttribute('data-value'),'51000');
             await page.getByTestId('attack-front_center').click();
-            for(const slot of ['front_left','front_center','front_right']){assert.equal(await page.getByTestId('unit-'+slot).getAttribute('data-rested'),'true');assert.equal(await page.getByTestId('unit-'+slot).locator('.unit-power').evaluate(el=>getComputedStyle(el).opacity),'0.38');}
+            for(const slot of ['front_left','front_center','front_right']){
+                const unit=page.getByTestId('unit-'+slot);
+                assert.equal(await unit.getAttribute('data-rested'),'true');
+                assert.equal(await unit.locator('.unit-rest-label').innerText(),'横置');
+                assert.ok(await unit.locator('.unit-power').evaluate(el=>Number(getComputedStyle(el).opacity)>=.75),'rested power stays readable');
+                const label=await unit.locator('.unit-rest-label').boundingBox(),number=await unit.locator('.power-value').boundingBox();
+                assert.ok(label.y>=number.y+number.height-1,'rest label sits below the numeral');
+            }
             await page.screenshot({path:`layout-qa/${width}-rested.png`,fullPage:true});
             await page.getByTestId('attack-undo').click();await page.getByTestId('support-cancel').click();
+            assert.equal(await page.locator('.unit-rest-label').count(),0,'undo clears all rested labels');
             await page.getByTestId('back-intercept').click();
             const source=await page.getByTestId('unit-back_left').boundingBox();const target=await page.getByTestId('guard-circle').boundingBox();
             await page.mouse.move(source.x+source.width/2,source.y+source.height/2);await page.mouse.down();await wait(410);await page.mouse.move(target.x+target.width/2,target.y+target.height/2,{steps:10});await page.mouse.up();await wait(370);

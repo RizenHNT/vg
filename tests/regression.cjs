@@ -192,14 +192,15 @@ async function boot(save, measuredFit = false) {
     const choosing=x.state();x.done();x=await boot(choosing);assert.equal(x.test('unit-front_left').dataset.supportSelected,'true');assert.equal(x.test('unit-front_right').dataset.supportSelected,'true');
     await x.click('attack-front_center');assert.equal(x.state().units.front_left.isRested,true);assert.equal(x.state().units.front_right.isRested,true);assert.equal(x.state().units.back_left.isRested,false);assert.equal(x.state().units.back_center.isRested,false);
     for(const slot of ['front_left','front_center','front_right']) {
-        assert.equal(Number(x.dom.window.getComputedStyle(x.test('unit-'+slot).querySelector('.unit-power')).opacity),.38,'rested power dims');
-        assert.equal(Number(x.dom.window.getComputedStyle(x.test('total-'+slot)).opacity),.38,'rested column total dims');
+        assert.equal(x.test('unit-'+slot).querySelector('.unit-rest-label').textContent,'横置','rest has a visible state label');
+        assert.ok(Number(x.dom.window.getComputedStyle(x.test('unit-'+slot).querySelector('.unit-power')).opacity)>=.75,'rested power remains readable');
+        assert.ok(Number(x.dom.window.getComputedStyle(x.test('total-'+slot)).opacity)>=.75,'rested column total remains readable');
     }
     assert.equal(x.state().isMultiSupportMode,false);assert.deepEqual(x.state().supportSlots,[]);
     for(const slot of x.d.querySelectorAll('[data-slot]'))assert.ok(!slot.dataset.selection,'frames disappear after resolving');
     await x.click('turn-toggle');await x.click('attack-undo');assert.equal(x.state().units.front_left.isRested,false);assert.equal(x.state().units.front_center.isRested,false);
     assert.equal(x.state().isMultiSupportMode,true);assert.deepEqual(x.state().supportSlots,['front_left','front_right']);
-    assert.notEqual(Number(x.dom.window.getComputedStyle(x.test('unit-front_left').querySelector('.unit-power')).opacity),.38,'undo restores normal brightness');
+    assert.ok(!x.test('unit-front_left').querySelector('.unit-rest-label'),'undo clears the rested label');
     await x.click('support-cancel');assert.equal(x.state().units.back_left.isSupporting,true);assert.equal(x.state().isMultiSupportMode,false);
     await x.click('free-support');await x.click('unit-back_left');await x.escape();assert.equal(x.state().units.back_left.isRested,false);assert.equal(x.state().isMultiSupportMode,false);
     for(const b of x.d.querySelectorAll('.column-attack')){assert.equal(b.textContent.trim(),'攻击');assert.ok(!b.querySelector('.power-fit'));}
@@ -211,14 +212,15 @@ async function boot(save, measuredFit = false) {
     await x.click('unit-front_left');await x.click('unit-front_right');await x.click('unit-front_center');await x.click('unit-back_center');
     assert.equal(x.d.querySelectorAll('[data-support-selected=true]').length,0,'unavailable and empty units cannot be selected');x.done();
 
-    // OT numerals dim with other rested numbers and recover when stood.
+    // Rest is explicit without obscuring OT numerals; standing clears the label.
     x=await boot({units:{front_center:{grade:3,basePower:13000,powerBuff:100000000,otActive:true}}});
     await x.click('attack-front_center');
-    assert.equal(Number(x.dom.window.getComputedStyle(x.test('unit-front_center').querySelector('.unit-power')).opacity),.38);
+    assert.equal(x.test('unit-front_center').querySelector('.unit-rest-label').textContent,'横置');
+    assert.ok(Number(x.dom.window.getComputedStyle(x.test('unit-front_center').querySelector('.unit-power')).opacity)>=.75);
     assert.equal(Number(x.test('unit-front_center').dataset.value),100013000,'rest does not change the value');
     await x.click('turn-toggle');await x.text('回合开始');
     assert.equal(x.state().units.front_center.isRested,false);
-    assert.notEqual(Number(x.dom.window.getComputedStyle(x.test('unit-front_center').querySelector('.unit-power')).opacity),.38);x.done();
+    assert.ok(!x.test('unit-front_center').querySelector('.unit-rest-label'));x.done();
 
     // Normal and rear attacks stay independently selectable, including after one attacker rests.
     x = await boot({ units: { front_left:{basePower:10000,grade:2},back_left:{basePower:8000,grade:1,isBackRowAttack:true},front_right:{basePower:12000,grade:2},back_right:{basePower:6000,grade:1,isSupporting:true} } });
